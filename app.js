@@ -729,7 +729,7 @@ function renderHistory() {
   container.innerHTML = '';
   const days = Object.keys(historyLog).sort((a,b) => b.localeCompare(a));
   if (!days.length) {
-    container.innerHTML = '<div class="history-card"><div style="color:var(--text-secondary);font-size:0.9rem">No history yet. Complete a routine to see it here.</div></div>';
+    container.innerHTML = '<div class="history-card"><div class="history-empty">everything is quiet here.</div></div>';
     return;
   }
   days.forEach(day => {
@@ -740,8 +740,8 @@ function renderHistory() {
     card.className = 'history-card';
     card.innerHTML = `
       <div class="history-date">${new Date(day+'T12:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long'})}</div>
-      ${d.AM.total ? `<div class="history-row"><span>☀️ AM — ${d.AM.done}/${d.AM.total} steps</span><span>${amPct}%</span></div><div class="history-bar-wrap"><div class="history-bar" style="width:${amPct}%"></div></div>` : ''}
-      ${d.PM.total ? `<div class="history-row" style="margin-top:8px"><span>🌙 PM — ${d.PM.done}/${d.PM.total} steps</span><span>${pmPct}%</span></div><div class="history-bar-wrap"><div class="history-bar" style="width:${pmPct}%"></div></div>` : ''}
+      ${d.AM.total ? `<div class="history-section"><div class="history-row"><span class="history-label">☀️ AM · ${d.AM.done}/${d.AM.total} steps</span><span class="history-percent">${amPct}%</span></div><div class="history-bar-wrap"><div class="history-bar" style="width:${amPct}%"></div></div></div>` : ''}
+      ${d.PM.total ? `<div class="history-section"><div class="history-row"><span class="history-label">🌙 PM · ${d.PM.done}/${d.PM.total} steps</span><span class="history-percent">${pmPct}%</span></div><div class="history-bar-wrap"><div class="history-bar" style="width:${pmPct}%"></div></div></div>` : ''}
     `;
     container.appendChild(card);
   });
