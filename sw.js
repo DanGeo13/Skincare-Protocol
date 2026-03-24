@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = 'protocol-v1';
+const CACHE_NAME = 'protocol-v2';
 const urlsToCache = [
   './',
   './index.html',
