@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Protocol Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#1a1035" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -12,12 +16,15 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { height: 100%; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      font-family: "Inter", sans-serif;
       min-height: 100%;
       transition: background 0.8s ease, color 0.4s ease;
       padding-bottom: 90px;
       position: relative;
       overflow-x: hidden;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
 
     /* ── AM Theme ── */
@@ -125,6 +132,43 @@
       mask-image: linear-gradient(180deg, rgba(0,0,0,0.24), transparent 65%);
       opacity: 0.32;
     }
+    .next-task-chip {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      right: 14px;
+      z-index: 120;
+      min-width: 108px;
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 18px 36px rgba(0,0,0,0.18);
+      text-align: right;
+    }
+    .next-task-label {
+      display: block;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.72);
+      margin-bottom: 4px;
+    }
+    .next-task-value {
+      display: block;
+      font-size: 1.8rem;
+      line-height: 0.95;
+      font-weight: 800;
+      color: rgba(255,255,255,0.84);
+      font-variant-numeric: tabular-nums;
+    }
+    .next-task-note {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.72);
+    }
     @keyframes float-orb {
       0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
       50% { transform: translate3d(0, -14px, 0) scale(1.06); }
@@ -132,64 +176,89 @@
 
     /* ── Header ── */
     .app-header {
-      background: var(--header-gradient);
-      padding: 56px 20px 26px;
+      background: linear-gradient(180deg, rgba(11,19,38,0.92), rgba(11,19,38,0.62));
+      padding: calc(12px + env(safe-area-inset-top)) 22px 18px;
       text-align: left;
-      position: relative;
+      position: sticky;
+      top: 0;
       overflow: hidden;
-      box-shadow: var(--hero-shadow);
+      z-index: 60;
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
     }
     .app-header::before {
       content: '';
       position: absolute; inset: 0;
-      background: linear-gradient(180deg,rgba(255,255,255,0.08) 0%,transparent 100%);
+      background: linear-gradient(180deg,rgba(255,255,255,0.04) 0%,transparent 100%);
     }
-    .app-header h1 {
-      font-size: 1.1rem; font-weight: 700; letter-spacing: 0.12em;
-      text-transform: uppercase; color: rgba(255,255,255,0.85); position: relative;
+    .top-bar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .top-bar-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar-badge {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18), rgba(98,44,204,0.35));
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.22);
+      color: #efe7ff;
+      font-size: 1rem;
+    }
+    .app-header h1,
+    .header-glass,
+    #greeting-subtext {
+      display: none;
     }
     #greeting-text {
-      font-size: 1.8rem; font-weight: 800; color: #fff; margin-top: 4px; position: relative;
-    }
-    #greeting-subtext {
+      font-family: "Manrope", sans-serif;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #f0e8ff;
+      margin-top: 0;
       position: relative;
-      margin-top: 8px;
-      color: rgba(255,255,255,0.76);
-      font-size: 0.92rem;
-      max-width: 28rem;
-      line-height: 1.35;
+      letter-spacing: -0.03em;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.22);
     }
-    .header-glass {
-      position: relative;
-      margin-top: 18px;
+    .top-bar-actions {
       display: flex;
+      align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
     }
-    .header-chip {
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.04);
+      color: #cdb8ff;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.18);
-      color: #fff;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      backdrop-filter: blur(14px);
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
     }
 
     /* ── Progress Ring ── */
     .progress-ring-wrap {
-      display: grid;
-      grid-template-columns: 130px minmax(0, 1fr);
-      gap: 18px;
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: 24px 20px 8px;
+      gap: 18px;
+      padding: 30px 20px 12px;
     }
-    .ring-container { position: relative; width: 130px; height: 130px; }
+    .ring-container { position: relative; width: 212px; height: 212px; }
     .ring-container svg {
       transform: rotate(-90deg);
       filter: drop-shadow(0 0 10px var(--accent-glow));
@@ -200,38 +269,64 @@
       0%,100% { filter: drop-shadow(0 0 10px var(--accent-glow)) drop-shadow(0 0 20px var(--accent-glow)); }
       50%      { filter: drop-shadow(0 0 25px var(--accent-glow)) drop-shadow(0 0 50px var(--accent-glow)); }
     }
-    #progress-circle-bg { fill: none; stroke: var(--ring-bg); stroke-width: 8; }
+    #progress-circle-bg { fill: none; stroke: rgba(255,255,255,0.09); stroke-width: 8; }
     #progress-circle {
-      fill: none; stroke: var(--ring-stroke); stroke-width: 8; stroke-linecap: round;
+      fill: none; stroke: url(#progress-gradient); stroke-width: 10; stroke-linecap: round;
       transition: stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1);
+    }
+    .ring-container::after {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.04), rgba(255,255,255,0));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
     }
     .ring-center {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
+      z-index: 1;
     }
-    #progress-text { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+    #progress-text {
+      font-family: "Manrope", sans-serif;
+      font-size: 4rem;
+      font-weight: 800;
+      color: #e6dcff;
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+    }
     #progress-label {
-      font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--text-secondary); margin-top: 2px;
+      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.36em;
+      text-transform: uppercase; color: rgba(232,223,255,0.74); margin-top: 10px;
     }
     .routine-meta {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: center;
     }
     .phase-badge {
-      background: var(--badge-bg); color: var(--badge-color);
-      border: 1px solid var(--card-border); border-radius: 20px;
-      padding: 4px 12px; font-size: 0.75rem; font-weight: 700;
-      letter-spacing: 0.05em; backdrop-filter: blur(8px);
+      background: rgba(255,255,255,0.06);
+      color: #cab7ff;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      backdrop-filter: blur(8px);
     }
-    #time-context { color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; }
+    #time-context {
+      color: rgba(230,223,255,0.82);
+      font-size: 0.84rem;
+      font-weight: 500;
+      line-height: 1.55;
+      max-width: 18rem;
+    }
     .routine-summary {
-      width: 100%;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      display: none;
     }
     .summary-card {
       background: var(--card-bg);
@@ -381,6 +476,358 @@
       color: var(--pill-active-text);
       border-color: var(--accent);
       box-shadow: 0 0 16px var(--accent-glow);
+    }
+    .agenda-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 14px;
+      margin: 22px 2px 12px;
+    }
+    .agenda-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(232,223,255,0.54);
+    }
+    .agenda-subtitle {
+      margin-top: 7px;
+      font-family: "Manrope", sans-serif;
+      font-size: 1.85rem;
+      line-height: 1.15;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: #efe7ff;
+    }
+    .agenda-count {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #e9dcff;
+      white-space: nowrap;
+    }
+    .agenda-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+    .agenda-card {
+      display: grid;
+      grid-template-columns: 74px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+      background: rgba(21,31,52,0.94);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 28px;
+      padding: 18px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 24px 44px rgba(0,0,0,0.22);
+      transition: transform 0.24s ease, opacity 0.24s ease, border-color 0.24s ease;
+    }
+    .agenda-card.is-next {
+      border-color: rgba(110,249,188,0.2);
+      box-shadow: 0 0 0 1px rgba(110,249,188,0.18), 0 24px 44px rgba(0,0,0,0.24);
+    }
+    .agenda-card.done {
+      opacity: 0.5;
+      background: rgba(14,20,36,0.72);
+    }
+    .agenda-time {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #efe7ff;
+      letter-spacing: 0.03em;
+    }
+    .agenda-time-note {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.7rem;
+      color: rgba(229,221,255,0.54);
+    }
+    .agenda-name {
+      font-family: "Manrope", sans-serif;
+      font-size: 1.04rem;
+      font-weight: 800;
+      color: #f2ebff;
+      letter-spacing: -0.02em;
+    }
+    .agenda-desc {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      line-height: 1.35;
+      color: rgba(224,215,255,0.68);
+    }
+    .agenda-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .agenda-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: var(--timer-bg);
+      color: #cab7ff;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .agenda-action {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(201,181,255,0.35);
+      background: rgba(255,255,255,0.03);
+      color: #cab7ff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 2px;
+    }
+    .agenda-card.done .agenda-action {
+      background: rgba(98,44,204,0.26);
+      color: #d8c8ff;
+      border-color: rgba(98,44,204,0.3);
+      box-shadow: none;
+    }
+    .feature-card {
+      background: linear-gradient(180deg, rgba(36,45,74,0.95), rgba(28,36,60,0.92));
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 28px;
+      padding: 20px;
+      box-shadow: 0 24px 44px rgba(0,0,0,0.22);
+    }
+    .next-panel {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 18px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(98,44,204,0.34), rgba(208,188,255,0.12));
+      border: 1px solid rgba(161,123,255,0.34);
+      box-shadow: 0 20px 44px rgba(34,16,75,0.28);
+    }
+    .next-panel-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .next-panel-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.12);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #d9c9ff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .next-panel-title {
+      font-family: "Manrope", sans-serif;
+      font-size: 1.08rem;
+      font-weight: 800;
+      color: #f1e9ff;
+      letter-spacing: -0.03em;
+    }
+    .next-panel-subtitle {
+      margin-top: 4px;
+      font-size: 0.82rem;
+      color: rgba(236,228,255,0.7);
+    }
+    .next-panel-time {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .next-panel-time strong {
+      display: block;
+      font-family: "Manrope", sans-serif;
+      font-size: 2rem;
+      line-height: 0.95;
+      color: #dfd0ff;
+      letter-spacing: -0.05em;
+    }
+    .next-panel-time span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(230,220,255,0.46);
+    }
+    .live-focus-wrap {
+      margin-top: 24px;
+    }
+    .live-focus-title {
+      margin: 0 2px 12px;
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(232,223,255,0.54);
+      font-weight: 700;
+    }
+    .live-focus-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(26,39,63,0.98), rgba(23,31,54,0.98));
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 30px;
+      padding: 20px;
+      box-shadow: 0 24px 44px rgba(0,0,0,0.22);
+    }
+    .live-focus-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(110,249,188,0.08);
+      color: #6ef9bc;
+      font-size: 0.74rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .live-focus-pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #6ef9bc;
+      box-shadow: 0 0 12px rgba(110,249,188,0.55);
+    }
+    .live-focus-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .live-focus-time {
+      font-family: "Manrope", sans-serif;
+      font-size: 1.95rem;
+      line-height: 1.08;
+      color: #f2ebff;
+      letter-spacing: -0.05em;
+    }
+    .live-focus-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .live-focus-thumb {
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(82,102,142,0.92), rgba(18,23,40,0.96));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f1ebff;
+      font-size: 1.15rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .live-focus-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f0e8ff;
+    }
+    .live-focus-desc {
+      margin-top: 4px;
+      font-size: 0.82rem;
+      color: rgba(228,220,255,0.66);
+    }
+    .live-focus-status {
+      margin-left: auto;
+      flex-shrink: 0;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #4edea3, #73ffca);
+      color: #042615;
+      padding: 12px 20px;
+      font-size: 0.86rem;
+      font-weight: 800;
+      box-shadow: 0 16px 26px rgba(78,222,163,0.2);
+    }
+    .insight-card {
+      position: relative;
+      margin-top: 22px;
+      background: linear-gradient(180deg, rgba(43,50,77,0.92), rgba(35,41,67,0.92));
+      border-radius: 28px;
+      padding: 22px;
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: 0 24px 44px rgba(0,0,0,0.18);
+      overflow: hidden;
+    }
+    .insight-title {
+      font-family: "Manrope", sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #efe7ff;
+      margin-bottom: 10px;
+    }
+    .insight-body {
+      max-width: 18rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: rgba(235,228,255,0.82);
+    }
+    .insight-card::after {
+      content: "chat_bubble";
+      position: absolute;
+      right: 20px;
+      bottom: 14px;
+      font-family: "Material Symbols Outlined";
+      font-size: 76px;
+      color: rgba(255,255,255,0.08);
+    }
+    .floating-fab {
+      position: fixed;
+      right: 20px;
+      bottom: 104px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: none;
+      background: radial-gradient(circle at 30% 30%, #d8c8ff, #7f54ef);
+      color: #29114e;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 24px 44px rgba(57,29,120,0.38);
+      cursor: pointer;
+      z-index: 55;
+    }
+    .floating-fab .material-symbols-outlined {
+      font-size: 2rem;
+      font-weight: 300;
+    }
+    .bottom-nav {
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      border-radius: 28px;
+      background: rgba(9,16,31,0.88);
+      border-top: none;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.24);
+    }
+    .nav-btn {
+      border-radius: 20px;
+      padding: 10px 0;
+      color: rgba(207,194,240,0.46);
+    }
+    .nav-btn.active {
+      color: #d6c6ff;
+      background: rgba(98,44,204,0.18);
     }
     .step-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
@@ -548,6 +995,33 @@
     .section-label {
       font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.1em; color: var(--text-secondary); padding: 18px 0 8px;
+    }
+    .focus-switcher {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .focus-switcher-btn {
+      width: auto;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+    .focus-switcher-btn.active {
+      background: var(--pill-active-bg);
+      color: var(--pill-active-text);
+      border-color: var(--pill-active-bg);
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+    .editor-panel.hidden {
+      display: none !important;
     }
 
     /* ── Pill Row (Phase / Routine Type pickers) ── */
@@ -908,27 +1382,46 @@
 
     @media (max-width: 640px) {
       .progress-ring-wrap {
-        grid-template-columns: 1fr;
         justify-items: center;
       }
       .routine-meta {
         width: 100%;
-        align-items: stretch;
-      }
-      .routine-summary {
-        grid-template-columns: 1fr 1fr;
-      }
-      .app-header {
-        padding-top: 52px;
+        align-items: center;
       }
       .focus-editor-grid,
-      .focus-card {
+      .focus-card,
+      .agenda-card {
         grid-template-columns: 1fr;
+      }
+      .next-task-chip {
+        right: 10px;
+        top: max(10px, env(safe-area-inset-top));
+        min-width: 94px;
+        padding: 8px 10px;
+      }
+      .next-task-value {
+        font-size: 1.35rem;
+      }
+      .ring-container { width: 188px; height: 188px; }
+      #progress-text { font-size: 3.25rem; }
+      .next-panel {
+        padding: 16px;
+      }
+      .next-panel-time strong {
+        font-size: 1.5rem;
+      }
+      .live-focus-status {
+        margin-left: 0;
       }
     }
   </style>
 </head>
 <body class="theme-pm">
+  <div class="next-task-chip" aria-live="polite">
+    <span class="next-task-label">Next Task</span>
+    <span class="next-task-value" id="next-task-countdown">--:--</span>
+    <span class="next-task-note" id="next-task-note">Building today’s schedule</span>
+  </div>
   <div class="ambient-bg" aria-hidden="true">
     <div class="ambient-orb orb-1"></div>
     <div class="ambient-orb orb-2"></div>
@@ -936,12 +1429,16 @@
   </div>
 
   <header class="app-header">
-    <h1>Protocol Tracker</h1>
-    <div id="greeting-text">Good Evening, Dan 🌙</div>
-    <div id="greeting-subtext">Your evening reset is ready. Move through each step and let the app carry the momentum.</div>
-    <div class="header-glass">
-      <span class="header-chip" id="header-chip-routine">Evening ritual</span>
-      <span class="header-chip" id="header-chip-focus">Wind-down mode</span>
+    <div class="top-bar">
+      <div class="top-bar-main">
+        <div class="avatar-badge">D</div>
+        <div id="greeting-text">Good Evening, Dan 🌙</div>
+      </div>
+      <div class="top-bar-actions">
+        <button class="icon-btn" type="button" aria-label="Notifications">
+          <span class="material-symbols-outlined">notifications</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -949,9 +1446,15 @@
   <div id="view-routine" class="tab-content">
     <div class="progress-ring-wrap">
       <div class="ring-container">
-        <svg width="130" height="130" viewBox="0 0 130 130">
-          <circle id="progress-circle-bg" cx="65" cy="65" r="55"/>
-          <circle id="progress-circle"    cx="65" cy="65" r="55"/>
+        <svg width="212" height="212" viewBox="0 0 212 212">
+          <defs>
+            <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#d0bcff"></stop>
+              <stop offset="100%" stop-color="#622ccc"></stop>
+            </linearGradient>
+          </defs>
+          <circle id="progress-circle-bg" cx="106" cy="106" r="88"/>
+          <circle id="progress-circle" cx="106" cy="106" r="88"/>
         </svg>
         <div class="ring-center">
           <span id="progress-text">0%</span>
@@ -960,7 +1463,7 @@
       </div>
       <div class="routine-meta">
         <span class="phase-badge" id="phase-badge">Phase 1</span>
-        <span id="time-context">Loading…</span>
+        <span id="time-context">Your evening reset is ready. Move through each step and let the app carry the momentum.</span>
         <div class="routine-summary">
           <div class="summary-card">
             <span class="summary-label">Remaining</span>
@@ -975,16 +1478,55 @@
         </div>
       </div>
     </div>
-    <div id="timer-display" class="hidden"></div>
-    <div id="routine-container"></div>
-    <section class="focus-section">
-      <div class="focus-section-header">
+    <div class="next-panel" id="next-panel">
+      <div class="next-panel-main">
+        <div class="next-panel-icon">
+          <span class="material-symbols-outlined">bolt</span>
+        </div>
         <div>
-          <div class="focus-section-title">Daily Focus Blocks</div>
-          <div class="focus-section-sub">Exercise, mindfulness, and repeating commitments scheduled around your routine.</div>
+          <div class="next-panel-title" id="next-panel-title">Next: Evening Reset</div>
+          <div class="next-panel-subtitle" id="next-panel-subtitle">Mindfulness session</div>
         </div>
       </div>
-      <div id="focus-timeline"></div>
+      <div class="next-panel-time">
+        <strong id="next-panel-time">12:45</strong>
+        <span>Starts in</span>
+      </div>
+    </div>
+    <section class="live-focus-wrap">
+      <div class="live-focus-title">Current Focus</div>
+      <div class="live-focus-card" id="live-focus-card">
+        <div class="live-focus-pill">Live Now</div>
+        <div class="live-focus-head">
+          <div class="live-focus-time" id="live-focus-time">12:30 PM — Exercise</div>
+          <button class="icon-btn" type="button" aria-label="More">
+            <span class="material-symbols-outlined">more_horiz</span>
+          </button>
+        </div>
+        <div class="live-focus-meta">
+          <div class="live-focus-thumb" id="live-focus-thumb">✦</div>
+          <div>
+            <div class="live-focus-name" id="live-focus-name">Gym Session</div>
+            <div class="live-focus-desc" id="live-focus-desc">High intensity • 45 min</div>
+          </div>
+          <div class="live-focus-status" id="live-focus-status">Active</div>
+        </div>
+      </div>
+    </section>
+    <div id="timer-display" class="hidden"></div>
+    <section class="focus-section">
+      <div class="agenda-header">
+        <div>
+          <div class="agenda-title">Today’s Schedule</div>
+          <div class="agenda-subtitle" id="agenda-subtitle">Tasks and routines arranged by time for this date.</div>
+        </div>
+        <div class="agenda-count" id="agenda-count">0 items</div>
+      </div>
+      <div id="routine-container" class="agenda-list"></div>
+    </section>
+    <section class="insight-card">
+      <div class="insight-title">Sanctuary Insight</div>
+      <div class="insight-body" id="insight-body">Consistent evening routines lower cortisol levels and make the rest of the evening feel lighter.</div>
     </section>
     <div id="success-message" class="hidden">
       <div class="success-inner">
@@ -996,6 +1538,9 @@
       </div>
     </div>
   </div>
+  <button class="floating-fab" type="button" aria-label="Quick add" onclick="switchTab('settings')">
+    <span class="material-symbols-outlined">add</span>
+  </button>
 
   <!-- ── History Tab ── -->
   <div id="view-history" class="tab-content hidden">
@@ -1007,6 +1552,14 @@
   <div id="view-settings" class="tab-content hidden">
 
     <div class="section-label">Protocol Editor</div>
+    <div class="focus-switcher" id="editor-focus-switcher">
+      <button class="focus-switcher-btn active" data-area="skincare" onclick="selectEditorFocus('skincare')">Skin care</button>
+      <button class="focus-switcher-btn" data-area="exercise" onclick="selectEditorFocus('exercise')">Exercise</button>
+      <button class="focus-switcher-btn" data-area="mindfulness" onclick="selectEditorFocus('mindfulness')">Mindfulness</button>
+      <button class="focus-switcher-btn" data-area="engagement" onclick="selectEditorFocus('engagement')">Engagements</button>
+    </div>
+
+    <div id="editor-panel-skincare" class="editor-panel">
 
     <div class="editor-context-card">
       <span class="editor-context-label">Live right now</span>
@@ -1033,6 +1586,7 @@
 
     <!-- Add step / modifier button -->
     <button class="add-step-btn" id="add-step-btn" onclick="addEditorItem()">＋ Add Step</button>
+    <button class="json-import-btn" style="margin-top:10px" onclick="applySkincareEditorChanges()">Apply Skin Care Changes</button>
 
     <!-- Phase settings -->
     <div class="section-label" style="margin-top:8px">Phase Settings</div>
@@ -1049,16 +1603,37 @@
       </div>
     </div>
 
-    <div class="section-label">Focus Planner</div>
-    <div id="focus-editor-list"></div>
-    <button class="add-step-btn focus-add-btn" onclick="addFocusItem()">＋ Add Focus Block</button>
-
     <!-- Advanced JSON -->
     <div class="section-label">Advanced</div>
     <details class="json-details">
-      <summary>Export / Import JSON</summary>
+      <summary>Skin care JSON</summary>
       <textarea id="set-protocol-json" rows="10" placeholder="Paste JSON here to import…"></textarea>
-      <button class="json-import-btn" onclick="importFromJSON()">⬆ Import from JSON</button>
+      <button class="json-import-btn" onclick="importFromJSON()">⬆ Import skin care JSON</button>
+    </details>
+    </div>
+
+    <div id="editor-panel-focus" class="editor-panel hidden">
+    <div class="editor-context-card">
+      <span class="editor-context-label">Activity focus editor</span>
+      <div class="editor-context-main">
+        <span class="editor-context-value" id="focus-editor-context">Exercise blocks</span>
+      </div>
+    </div>
+
+    <div id="focus-editor-list"></div>
+    <button class="add-step-btn focus-add-btn" onclick="addFocusItem()">＋ Add Focus Block</button>
+    <details class="json-details">
+      <summary>Activity JSON</summary>
+      <textarea id="set-focus-json" rows="10" placeholder="Paste JSON here to import selected activity focus…"></textarea>
+      <button class="json-import-btn" onclick="importFocusJSON()">⬆ Import activity JSON</button>
+    </details>
+    </div>
+
+    <!-- Advanced JSON -->
+    <div class="section-label">All Data</div>
+    <details class="json-details">
+      <summary>Export everything</summary>
+      <textarea id="set-all-json" rows="10" readonly></textarea>
     </details>
 
   </div>
