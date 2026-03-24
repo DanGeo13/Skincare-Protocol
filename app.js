@@ -9,12 +9,46 @@ function readJsonStorage(key, fallback) {
   }
 }
 
+const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
 let protocolData = readJsonStorage('customProtocol', DEFAULT_PROTOCOL);
 let historyLog   = readJsonStorage('skincareHistory', {});
 let settings = {
   startDate: localStorage.getItem('startDate') || new Date().toISOString().split('T')[0],
   phaseDays: parseInt(localStorage.getItem('phaseDays'), 10) || 14
 };
+let focusPlanner = readJsonStorage('focusPlanner', [
+  {
+    id: 'focus-exercise-default',
+    category: 'exercise',
+    name: 'Exercise block',
+    desc: 'Walk, gym, or mobility work to keep the day moving.',
+    time: '07:00',
+    duration: 45,
+    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    flexible: true
+  },
+  {
+    id: 'focus-mindfulness-default',
+    category: 'mindfulness',
+    name: 'Mindfulness reset',
+    desc: 'Breathing, journaling, or a short meditation block.',
+    time: '21:00',
+    duration: 15,
+    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Sunday'],
+    flexible: true
+  },
+  {
+    id: 'focus-reminder-default',
+    category: 'engagement',
+    name: 'Important repeating engagement',
+    desc: 'Use for calls, admin, family commitments, or recurring appointments.',
+    time: '18:30',
+    duration: 30,
+    days: ['Tuesday', 'Thursday'],
+    flexible: false
+  }
+]).map(normalizeFocusItem);
 
 let timerInterval = null;
 const timerSound  = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -22,6 +56,7 @@ const timerSound  = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/
 // Editor state
 let editorPhase   = String(Object.keys(protocolData).sort((a,b)=>Number(a)-Number(b))[0] || '1');
 let editorRoutine = 'AM';
+let focusSaveTimer = null;
 
 // Init settings inputs
 document.getElementById('set-start-date').value  = settings.startDate;
@@ -35,8 +70,10 @@ function switchTab(tab) {
   if (settingsView && !settingsView.classList.contains('hidden')) {
     clearTimeout(autoSaveTimer);
     clearTimeout(phaseNameTimeout);
+    clearTimeout(focusSaveTimer);
     saveEditorState();
     flushPhaseName();
+    saveFocusState();
   }
 
   ['routine','history','settings'].forEach(t => {
@@ -47,7 +84,10 @@ function switchTab(tab) {
   document.getElementById(`nav-${tab}`).classList.add('active');
   if (tab === 'routine')  renderRoutine();
   if (tab === 'history')  renderHistory();
-  if (tab === 'settings') renderProtocolEditor();
+  if (tab === 'settings') {
+    syncEditorToCurrentRoutine(false);
+    renderProtocolEditor();
+  }
 }
 
 function applyTheme(isPM) {
@@ -87,6 +127,27 @@ function getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek) {
   return routineSteps;
 }
 
+function getCurrentRoutineContext() {
+  const now = new Date();
+  const isPM = now.getHours() >= 12;
+  const dayOfWeek = now.toLocaleDateString('en-AU', { weekday: 'long' });
+  const phaseNum = calculatePhase();
+  const phaseKey = String(phaseNum);
+  const phaseData = protocolData[phaseKey] || protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
+  let routineKey = 'AM';
+
+  if (isPM) {
+    const isRetrieveNight = ['Monday', 'Wednesday', 'Friday'].includes(dayOfWeek);
+    if (phaseNum <= 2 || isRetrieveNight) routineKey = 'PM_A';
+    else if (['Tuesday', 'Thursday'].includes(dayOfWeek)) routineKey = 'PM_B_TueThu';
+    else if (dayOfWeek === 'Saturday') routineKey = 'PM_B_Sat';
+    else if (dayOfWeek === 'Sunday') routineKey = 'PM_B_Sun';
+    else routineKey = 'PM_B';
+  }
+
+  return { now, isPM, dayOfWeek, phaseNum, phaseKey, phaseData, routineKey };
+}
+
 function updateRoutineHeader(isPM, dayOfWeek, total, doneCount, percent) {
   const chipRoutine = document.getElementById('header-chip-routine');
   const chipFocus = document.getElementById('header-chip-focus');
@@ -108,6 +169,109 @@ function updateRoutineHeader(isPM, dayOfWeek, total, doneCount, percent) {
   document.getElementById('summary-remaining-note').innerText = remaining === 1 ? 'step to go' : 'steps to go';
   document.getElementById('summary-completion').innerText = `${doneCount} / ${total}`;
   document.getElementById('summary-completion-note').innerText = percent === 100 ? 'fully complete' : `${percent}% of this session`;
+}
+
+function normalizeFocusItem(item = {}) {
+  return {
+    id: item.id || `focus-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    category: item.category || 'exercise',
+    name: item.name || '',
+    desc: item.desc || '',
+    time: item.time || '07:00',
+    duration: Number(item.duration) || 30,
+    days: Array.isArray(item.days) && item.days.length ? item.days : DAY_NAMES.slice(0, 5),
+    flexible: item.flexible !== false
+  };
+}
+
+function persistFocusPlanner() {
+  localStorage.setItem('focusPlanner', JSON.stringify(focusPlanner));
+}
+
+function toMinutes(timeStr) {
+  const [hours, minutes] = String(timeStr || '00:00').split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function toTimeString(totalMinutes) {
+  const safe = Math.max(0, totalMinutes);
+  const hours = Math.floor(safe / 60) % 24;
+  const minutes = safe % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function formatClock(timeStr) {
+  const [hoursRaw, minutesRaw] = String(timeStr || '00:00').split(':');
+  const hours = Number(hoursRaw) || 0;
+  const minutes = Number(minutesRaw) || 0;
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = ((hours + 11) % 12) + 1;
+  return `${displayHour}:${String(minutes).padStart(2, '0')} ${suffix}`;
+}
+
+function generateTodayFocusBlocks(dayOfWeek) {
+  const todaysItems = focusPlanner
+    .filter(item => item.days.includes(dayOfWeek) && item.name.trim())
+    .map(item => normalizeFocusItem(item))
+    .sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
+
+  let cursor = 0;
+  return todaysItems.map(item => {
+    const preferredStart = toMinutes(item.time);
+    const start = item.flexible ? Math.max(preferredStart, cursor) : preferredStart;
+    const end = start + Math.max(5, Number(item.duration) || 0);
+    cursor = Math.max(cursor, end);
+    return {
+      ...item,
+      scheduledStart: toTimeString(start),
+      scheduledEnd: toTimeString(end),
+      pushed: item.flexible && start !== preferredStart
+    };
+  });
+}
+
+function toggleFocusBlock(id) {
+  const today = getTodayKey();
+  if (!historyLog[today]) historyLog[today] = { AM:{done:0,total:0}, PM:{done:0,total:0}, steps:{AM:[],PM:[]}, focusDone:[] };
+  if (!Array.isArray(historyLog[today].focusDone)) historyLog[today].focusDone = [];
+  const done = historyLog[today].focusDone;
+  if (done.includes(id)) done.splice(done.indexOf(id), 1);
+  else done.push(id);
+  localStorage.setItem('skincareHistory', JSON.stringify(historyLog));
+  if ('vibrate' in navigator) navigator.vibrate(40);
+  renderRoutine();
+}
+
+function renderFocusTimeline(dayOfWeek) {
+  const container = document.getElementById('focus-timeline');
+  const blocks = generateTodayFocusBlocks(dayOfWeek);
+  const today = getTodayKey();
+  const done = historyLog[today]?.focusDone || [];
+
+  if (!blocks.length) {
+    container.innerHTML = '<div class="focus-empty">No focus blocks scheduled for today yet. Add exercise, mindfulness, or recurring commitments in Settings.</div>';
+    return;
+  }
+
+  container.className = 'focus-timeline';
+  container.innerHTML = blocks.map(block => `
+    <div class="focus-card${done.includes(block.id) ? ' done' : ''}">
+      <div>
+        <div class="focus-time">${formatClock(block.scheduledStart)}</div>
+        <span class="focus-duration">${block.duration} min</span>
+      </div>
+      <div>
+        <div class="focus-name">${escHtml(block.name)}</div>
+        ${block.desc ? `<div class="focus-desc">${escHtml(block.desc)}</div>` : ''}
+        <div class="focus-tags">
+          <span class="focus-tag">${escHtml(block.category)}</span>
+          <span class="focus-tag">${formatClock(block.scheduledStart)} - ${formatClock(block.scheduledEnd)}</span>
+          ${block.pushed ? '<span class="focus-tag">smart-pushed</span>' : ''}
+        </div>
+      </div>
+      <button class="focus-toggle" onclick="toggleFocusBlock('${block.id}')" title="Mark focus block complete">${done.includes(block.id) ? '✓' : '○'}</button>
+    </div>
+  `).join('');
 }
 
 // ══════════════════════════════════════════
@@ -150,14 +314,10 @@ function resetToday() {
 }
 
 function renderRoutine() {
-  const now       = new Date();
-  const isPM      = now.getHours() >= 12;
-  const dayOfWeek = now.toLocaleDateString('en-AU', {weekday:'long'});
+  const { isPM, dayOfWeek, phaseNum, phaseData } = getCurrentRoutineContext();
 
   applyTheme(isPM);
 
-  const phaseNum  = calculatePhase();
-  const phaseData = protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
   document.getElementById('phase-badge').innerText   = phaseData.name || `Phase ${phaseNum}`;
   document.getElementById('time-context').innerText  = `${dayOfWeek} · ${isPM ? 'PM Routine' : 'AM Routine'}`;
 
@@ -191,6 +351,7 @@ function renderRoutine() {
   container.classList.remove('hidden');
   successMsg.classList.add('hidden');
   container.innerHTML = '';
+  renderFocusTimeline(dayOfWeek);
 
   const stepEntries = routineSteps.map((step, i) => ({
     step,
@@ -291,16 +452,37 @@ const ROUTINE_TYPES = [
   { key:'AM',         label:'☀️ AM'       },
   { key:'PM_A',       label:'🌙 PM-A'     },
   { key:'PM_B',       label:'🌙 PM-B'     },
+  { key:'PM_B_TueThu',label:'🌙 Tue/Thu'  },
   { key:'PM_B_Sat',   label:'🌙 Sat'      },
   { key:'PM_B_Sun',   label:'🌙 Sun'      },
   { key:'Modifiers',  label:'⚡ Modifiers' },
 ];
-const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const DAYS = DAY_NAMES;
+const FOCUS_CATEGORIES = [
+  { key: 'exercise', label: 'Exercise' },
+  { key: 'mindfulness', label: 'Mindfulness' },
+  { key: 'engagement', label: 'Engagement' }
+];
+
+function getRoutineLabel(routineKey) {
+  return ROUTINE_TYPES.find(r => r.key === routineKey)?.label || routineKey;
+}
+
+function syncEditorToCurrentRoutine(shouldRender = true) {
+  const context = getCurrentRoutineContext();
+  editorPhase = context.phaseKey;
+  editorRoutine = context.routineKey;
+  if (shouldRender) renderProtocolEditor();
+}
 
 function renderProtocolEditor() {
+  const liveContext = getCurrentRoutineContext();
+  const liveLabel = `${liveContext.phaseData?.name || `Phase ${liveContext.phaseNum}`} · ${getRoutineLabel(liveContext.routineKey)} · ${liveContext.dayOfWeek}`;
+  document.getElementById('editor-live-context').innerText = liveLabel;
   renderPhasePicker();
   renderRoutineTypePicker();
   renderStepList();
+  renderFocusEditor();
   // Sync phase name input
   const phaseName = protocolData[editorPhase]?.name || '';
   document.getElementById('phase-name-input').value = phaseName;
@@ -509,6 +691,101 @@ function saveEditorState() {
     saveStepState();
   }
   persistProtocol();
+  showSavedIndicator();
+}
+
+function scheduleFocusSave() {
+  clearTimeout(focusSaveTimer);
+  focusSaveTimer = setTimeout(saveFocusState, 400);
+}
+
+function renderFocusEditor() {
+  const container = document.getElementById('focus-editor-list');
+  container.innerHTML = '';
+
+  if (!focusPlanner.length) {
+    container.innerHTML = '<div class="editor-empty">No focus blocks yet — add one for exercise, mindfulness, or repeating commitments.</div>';
+    return;
+  }
+
+  focusPlanner.forEach((item, index) => {
+    const normalized = normalizeFocusItem(item);
+    const dayButtons = DAYS.map(day => `
+      <button class="focus-day-pill${normalized.days.includes(day) ? ' active' : ''}" onclick="toggleFocusDay(this)" data-day="${day}" type="button">${day.slice(0, 3)}</button>
+    `).join('');
+
+    container.insertAdjacentHTML('beforeend', `
+      <div class="focus-editor-card" data-focus-index="${index}">
+        <div class="focus-editor-grid">
+          <input type="text" class="focus-name-input" value="${escHtml(normalized.name)}" placeholder="Focus block name" oninput="scheduleFocusSave()"/>
+          <input type="time" class="focus-time-input" value="${normalized.time}" oninput="scheduleFocusSave()"/>
+          <input type="number" class="focus-duration-input" min="5" max="240" step="5" value="${normalized.duration}" placeholder="Minutes" oninput="scheduleFocusSave()"/>
+        </div>
+        <div class="focus-editor-grid">
+          <select class="focus-category-input" onchange="scheduleFocusSave()">
+            ${FOCUS_CATEGORIES.map(category => `<option value="${category.key}"${category.key === normalized.category ? ' selected' : ''}>${category.label}</option>`).join('')}
+          </select>
+          <div class="focus-flags">
+            <input type="checkbox" class="focus-flex-input" ${normalized.flexible ? 'checked' : ''} onchange="scheduleFocusSave()"/>
+            <span>Allow smart push</span>
+          </div>
+          <button class="editor-delete-btn" onclick="deleteFocusItem(${index})" title="Remove focus block">✕</button>
+        </div>
+        <textarea class="focus-desc-input" placeholder="Details or prep notes" oninput="scheduleFocusSave()">${escHtml(normalized.desc)}</textarea>
+        <div class="focus-editor-row">
+          <div class="focus-days">${dayButtons}</div>
+        </div>
+      </div>
+    `);
+  });
+}
+
+function toggleFocusDay(button) {
+  button.classList.toggle('active');
+  scheduleFocusSave();
+}
+
+function saveFocusState() {
+  const cards = document.querySelectorAll('#focus-editor-list .focus-editor-card');
+  focusPlanner = Array.from(cards).map(card => {
+    const index = Number(card.getAttribute('data-focus-index'));
+    const original = focusPlanner[index] || {};
+    const days = Array.from(card.querySelectorAll('.focus-day-pill.active')).map(dayButton => dayButton.dataset.day);
+    return normalizeFocusItem({
+      id: original.id,
+      category: card.querySelector('.focus-category-input')?.value,
+      name: card.querySelector('.focus-name-input')?.value.trim(),
+      desc: card.querySelector('.focus-desc-input')?.value.trim(),
+      time: card.querySelector('.focus-time-input')?.value || '07:00',
+      duration: parseInt(card.querySelector('.focus-duration-input')?.value, 10) || 30,
+      days,
+      flexible: Boolean(card.querySelector('.focus-flex-input')?.checked)
+    });
+  }).filter(item => item.name);
+
+  persistFocusPlanner();
+  showSavedIndicator();
+}
+
+function addFocusItem() {
+  saveFocusState();
+  focusPlanner.push(normalizeFocusItem({
+    category: 'exercise',
+    name: '',
+    desc: '',
+    time: '07:00',
+    duration: 30,
+    days: DAYS.slice(0, 5),
+    flexible: true
+  }));
+  persistFocusPlanner();
+  renderFocusEditor();
+}
+
+function deleteFocusItem(index) {
+  focusPlanner.splice(index, 1);
+  persistFocusPlanner();
+  renderFocusEditor();
   showSavedIndicator();
 }
 
