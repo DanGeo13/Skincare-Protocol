@@ -2,59 +2,154 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Protocol Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Protocol</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        :root { --bg: #121212; --surface: #1e1e1e; --primary: #bb86fc; --text: #ffffff; --text-muted: #a0a0a0; }
-        body { font-family: system-ui, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; padding-bottom: 80px; }
-        h1, h2, h3 { margin-top: 0; }
-        .card { background: var(--surface); padding: 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .step { display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #333; }
+        /* Base PM (Dark) Theme Variables */
+        :root {
+            --bg-grad: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --glass-bg: rgba(30, 41, 59, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #818cf8;
+            --accent: #38bdf8;
+            --success: #10b981;
+            --missed: #ef4444;
+        }
+        /* AM (Light) Theme Variables */
+        body.theme-am {
+            --bg-grad: linear-gradient(135deg, #fdfbfb 0%, #e2e8f0 100%);
+            --glass-bg: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(0, 0, 0, 0.1);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --accent: #0ea5e9;
+        }
+
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-grad); color: var(--text-main); margin: 0; padding: 20px; padding-bottom: 100px; min-height: 100vh; transition: background 0.5s ease; }
+        h1, h2, h3 { margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
+        
+        /* Glassmorphic Cards */
+        .card { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; margin-bottom: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+        
+        /* Header & Progress Ring */
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .greeting-area h2 { margin-bottom: 4px; font-size: 1.8rem; }
+        
+        .progress-container { position: relative; width: 70px; height: 70px; }
+        .progress-ring__circle-bg { stroke: var(--glass-border); fill: transparent; stroke-width: 6; }
+        .progress-ring__circle { stroke: var(--primary); fill: transparent; stroke-width: 6; stroke-dasharray: 188.4; stroke-dashoffset: 188.4; transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform: rotate(-90deg); transform-origin: 50% 50%; }
+        .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 700; font-size: 0.85rem; }
+
+        /* Step & Checkbox Styling */
+        .step { display: flex; align-items: flex-start; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--glass-border); transition: all 0.3s ease; cursor: pointer; }
         .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .step-number { background: var(--primary); color: #000; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px; flex-shrink: 0; }
-        button { background: var(--primary); color: #000; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; width: 100%; margin-top: 10px; cursor: pointer; }
-        input[type="time"], input[type="date"] { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; background: #333; border: none; color: white; border-radius: 6px; color-scheme: dark; }
-        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); display: flex; padding: 15px; border-top: 1px solid #333; }
-        .nav div { flex: 1; text-align: center; color: var(--text-muted); font-weight: bold; cursor: pointer; }
+        
+        /* Custom Checkbox */
+        .custom-checkbox { width: 26px; height: 26px; border: 2px solid var(--text-muted); border-radius: 8px; margin-right: 15px; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+        .custom-checkbox svg { width: 16px; height: 16px; fill: none; stroke: white; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(0.5); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        .step-content { flex-grow: 1; pointer-events: none; }
+        .step-title { font-size: 1.05rem; font-weight: 600; transition: all 0.3s; }
+        .step-desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; transition: all 0.3s; }
+        
+        /* Completed State Animations */
+        .step.done { opacity: 0.6; transform: translateX(4px); }
+        .step.done .custom-checkbox { background: var(--primary); border-color: var(--primary); }
+        .step.done .custom-checkbox svg { opacity: 1; transform: scale(1); }
+        .step.done .step-title { text-decoration: line-through; color: var(--text-muted); }
+        
+        /* Success Message */
+        #success-message { text-align: center; padding: 20px; font-weight: bold; color: var(--success); font-size: 1.2rem; animation: popIn 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
+
+        /* History Log Styling */
+        .log-day { background: var(--glass-bg); padding: 15px; border-radius: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--glass-border); }
+        .log-date { font-weight: bold; font-size: 1.1rem; }
+        .log-stats { text-align: right; font-size: 0.9rem; color: var(--text-muted); }
+        .perfect { color: var(--success); font-weight: bold; }
+        .skipped { color: var(--missed); font-weight: bold; }
+
+        /* Buttons, Inputs & Overlays */
+        button { background: var(--primary); color: #fff; border: none; padding: 14px 20px; border-radius: 12px; font-weight: 700; font-size: 16px; width: 100%; cursor: pointer; transition: transform 0.1s; }
+        button:active { transform: scale(0.98); }
+        .btn-timer { background: var(--accent); padding: 8px 12px; font-size: 0.9rem; border-radius: 8px; margin-top: 10px; width: auto; pointer-events: auto; }
+        
+        input, textarea { width: 100%; padding: 12px; margin-top: 6px; margin-bottom: 16px; background: rgba(0,0,0,0.1); border: 1px solid var(--glass-border); color: var(--text-main); border-radius: 10px; box-sizing: border-box; }
+        
+        /* Glass Nav */
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; padding: 15px; border-top: 1px solid var(--glass-border); z-index: 50; padding-bottom: max(15px, env(safe-area-inset-bottom)); }
+        .nav div { flex: 1; text-align: center; color: var(--text-muted); font-weight: 600; cursor: pointer; transition: color 0.2s; }
         .nav .active { color: var(--primary); }
-        .hidden { display: none; }
-        #phase-badge { background: #333; padding: 4px 10px; border-radius: 12px; font-size: 0.8em; vertical-align: middle; margin-left: 10px; }
+        .hidden { display: none !important; }
+        
+        #phase-badge { background: rgba(129, 140, 248, 0.2); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 0.8em; font-weight: bold; display: inline-block; margin-bottom: 12px; border: 1px solid var(--glass-border); }
+        
+        #active-timer-bar { position: fixed; top: 0; left: 0; right: 0; background: var(--glass-bg); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); color: var(--text-main); padding: max(15px, env(safe-area-inset-top)) 15px 15px 15px; text-align: center; font-weight: bold; font-size: 1.5rem; z-index: 100; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #btn-stop-timer { background: rgba(255,255,255,0.2); width: auto; padding: 8px 16px; margin: 0; }
     </style>
 </head>
-<body>
+<body class="theme-pm">
+
+    <div id="active-timer-bar" class="hidden">
+        <span id="timer-display">20:00</span>
+        <button id="btn-stop-timer">Stop</button>
+    </div>
 
     <div id="view-routine">
-        <h2>Right Now <span id="phase-badge">Loading...</span></h2>
-        <p style="color: var(--text-muted); margin-top:-10px;" id="time-context">Checking time...</p>
+        <div id="phase-badge">Loading Phase...</div>
+        
+        <div class="header-container">
+            <div class="greeting-area">
+                <h2 id="greeting-text">Good Evening</h2>
+                <p style="color: var(--text-muted); margin:0;" id="time-context">Checking schedule...</p>
+            </div>
+            
+            <div class="progress-container">
+                <svg class="progress-ring" width="70" height="70">
+                    <circle class="progress-ring__circle-bg" cx="35" cy="35" r="30"></circle>
+                    <circle class="progress-ring__circle" id="progress-circle" cx="35" cy="35" r="30"></circle>
+                </svg>
+                <div class="progress-text" id="progress-text">0%</div>
+            </div>
+        </div>
         
         <div class="card" id="routine-container">
             </div>
-        <button id="btn-complete">Mark Complete</button>
+        <div id="success-message" class="card hidden">
+            ✨ Protocol Complete. Great job.
+        </div>
+    </div>
+
+    <div id="view-history" class="hidden">
+        <h2>Logbook</h2>
+        <p style="color: var(--text-muted); margin-top:-10px; margin-bottom: 20px;">Past 7 Days Adherence</p>
+        <div id="history-container"></div>
     </div>
 
     <div id="view-settings" class="hidden">
-        <h2>App Settings</h2>
+        <h2>Settings</h2>
         <div class="card">
-            <label>Protocol Start Date</label>
+            <label>Start Date</label>
             <input type="date" id="set-start-date">
-            
-            <label>Morning Reminder Time</label>
-            <input type="time" id="set-am-time">
-            
-            <label>Evening Reminder Time</label>
-            <input type="time" id="set-pm-time">
-            
-            <label>Phase Duration (Days per phase)</label>
-            <input type="number" id="set-phase-days" value="14" style="width:100%; padding:10px; margin-top:5px; margin-bottom:15px; background:#333; border:none; color:white; border-radius:6px;">
+            <label>Days per Phase</label>
+            <input type="number" id="set-phase-days">
+            <button id="btn-save-settings">Save Basic Settings</button>
+        </div>
 
-            <button id="btn-save-settings">Save & Update</button>
-            <button id="btn-enable-notifs" style="background:#333; color:white; margin-top:15px;">Enable Notifications</button>
+        <div class="card">
+            <h3>Edit Protocol (JSON)</h3>
+            <textarea id="set-protocol-json"></textarea>
+            <button id="btn-save-protocol" style="background: transparent; border: 1px solid var(--accent); color: var(--accent);">Save Protocol Data</button>
         </div>
     </div>
 
     <div class="nav">
         <div id="nav-routine" class="active" onclick="switchTab('routine')">Routine</div>
+        <div id="nav-history" onclick="switchTab('history')">History</div>
         <div id="nav-settings" onclick="switchTab('settings')">Settings</div>
     </div>
 
