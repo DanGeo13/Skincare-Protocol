@@ -1,5 +1,4 @@
 // app.js
-
 let protocolData = JSON.parse(localStorage.getItem('customProtocol')) || DEFAULT_PROTOCOL;
 let historyLog = JSON.parse(localStorage.getItem('skincareHistory')) || {};
 
@@ -39,7 +38,6 @@ function calculatePhase() {
 function getTodayKey() { return new Date().toISOString().split('T')[0]; }
 
 function toggleStep(index, totalSteps, isPM) {
-    // Haptic Micro-interaction
     if ("vibrate" in navigator) navigator.vibrate(50);
 
     const today = getTodayKey();
@@ -66,7 +64,6 @@ function renderRoutine() {
     const isPM = now.getHours() >= 12; 
     const dayOfWeek = now.toLocaleDateString('en-AU', { weekday: 'long' });
     
-    // Dynamic Theming
     document.body.className = isPM ? 'theme-pm' : 'theme-am';
     document.getElementById('greeting-text').innerText = isPM ? 'Good Evening, Dan' : 'Good Morning, Dan';
     
@@ -100,7 +97,6 @@ function renderRoutine() {
     const completedSteps = historyLog[today]?.steps?.[timeOfDay] || [];
     const totalSteps = routineSteps.length;
 
-    // Update Progress Ring
     const percent = totalSteps === 0 ? 0 : Math.round((completedSteps.length / totalSteps) * 100);
     const circle = document.getElementById('progress-circle');
     const radius = circle.r.baseVal.value;
@@ -117,7 +113,7 @@ function renderRoutine() {
     if (percent === 100 && totalSteps > 0) {
         container.classList.add('hidden');
         successMsg.classList.remove('hidden');
-        if ("vibrate" in navigator && completedSteps.length === totalSteps) navigator.vibrate([100, 50, 100]); // Success buzz
+        if ("vibrate" in navigator && completedSteps.length === totalSteps) navigator.vibrate([100, 50, 100]); 
     } else {
         container.classList.remove('hidden');
         successMsg.classList.add('hidden');
