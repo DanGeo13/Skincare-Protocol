@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Protocol Tracker</title>
   <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a1035" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <style>
@@ -15,6 +16,8 @@
       min-height: 100%;
       transition: background 0.8s ease, color 0.4s ease;
       padding-bottom: 90px;
+      position: relative;
+      overflow-x: hidden;
     }
 
     /* ── AM Theme ── */
@@ -44,6 +47,8 @@
       --pill-active-bg: #f97316;
       --pill-active-text: #fff;
       --delete-color: #dc2626;
+      --surface-highlight: rgba(255,255,255,0.48);
+      --hero-shadow: 0 20px 45px rgba(249,115,22,0.22);
       background: var(--bg-gradient);
       color: var(--text-primary);
     }
@@ -74,17 +79,65 @@
       --pill-active-bg: #a78bfa;
       --pill-active-text: #0d1b2a;
       --delete-color: #f87171;
+      --surface-highlight: rgba(255,255,255,0.08);
+      --hero-shadow: 0 22px 50px rgba(0,0,0,0.42);
       background: var(--bg-gradient);
       color: var(--text-primary);
+    }
+
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: -1;
+    }
+    .ambient-orb {
+      position: absolute;
+      border-radius: 999px;
+      filter: blur(10px);
+      opacity: 0.8;
+      transition: background 0.8s ease, transform 0.8s ease;
+      animation: float-orb 12s ease-in-out infinite;
+    }
+    .ambient-orb.orb-1 {
+      width: 240px;
+      height: 240px;
+      top: -40px;
+      right: -50px;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.45), rgba(255,255,255,0));
+    }
+    .ambient-orb.orb-2 {
+      width: 220px;
+      height: 220px;
+      bottom: 12%;
+      left: -80px;
+      background: radial-gradient(circle at 50% 50%, rgba(167,139,250,0.22), rgba(167,139,250,0));
+      animation-delay: -4s;
+    }
+    .ambient-grid {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,0.24), transparent 65%);
+      opacity: 0.32;
+    }
+    @keyframes float-orb {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(0, -14px, 0) scale(1.06); }
     }
 
     /* ── Header ── */
     .app-header {
       background: var(--header-gradient);
-      padding: 56px 20px 24px;
-      text-align: center;
+      padding: 56px 20px 26px;
+      text-align: left;
       position: relative;
       overflow: hidden;
+      box-shadow: var(--hero-shadow);
     }
     .app-header::before {
       content: '';
@@ -98,10 +151,43 @@
     #greeting-text {
       font-size: 1.8rem; font-weight: 800; color: #fff; margin-top: 4px; position: relative;
     }
+    #greeting-subtext {
+      position: relative;
+      margin-top: 8px;
+      color: rgba(255,255,255,0.76);
+      font-size: 0.92rem;
+      max-width: 28rem;
+      line-height: 1.35;
+    }
+    .header-glass {
+      position: relative;
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .header-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(14px);
+    }
 
     /* ── Progress Ring ── */
     .progress-ring-wrap {
-      display: flex; flex-direction: column; align-items: center; padding: 24px 20px 8px;
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 18px;
+      align-items: center;
+      padding: 24px 20px 8px;
     }
     .ring-container { position: relative; width: 130px; height: 130px; }
     .ring-container svg {
@@ -129,8 +215,10 @@
       text-transform: uppercase; color: var(--text-secondary); margin-top: 2px;
     }
     .routine-meta {
-      display: flex; align-items: center; gap: 10px; margin-top: 12px;
-      flex-wrap: wrap; justify-content: center;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
     }
     .phase-badge {
       background: var(--badge-bg); color: var(--badge-color);
@@ -139,37 +227,116 @@
       letter-spacing: 0.05em; backdrop-filter: blur(8px);
     }
     #time-context { color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; }
+    .routine-summary {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .summary-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 12px 14px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+    }
+    .summary-label {
+      display: block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .summary-value {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    .summary-note {
+      display: block;
+      margin-top: 5px;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+    }
 
     /* ── Tabs ── */
     .tab-content { padding: 0 16px; }
     .hidden { display: none !important; }
 
     /* ── Step Cards (Routine) ── */
+    #routine-container {
+      padding-top: 10px;
+    }
     .step-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
-      border-radius: 16px; padding: 14px 16px; margin-bottom: 10px;
+      border-radius: 20px; padding: 14px 16px; margin-bottom: 10px;
       backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       box-shadow: var(--shadow);
       display: flex; align-items: center; gap: 14px;
       cursor: pointer;
-      transition: transform 0.18s ease, background 0.3s ease, opacity 0.3s ease;
+      transition: transform 0.26s ease, background 0.35s ease, opacity 0.35s ease, box-shadow 0.3s ease;
       -webkit-tap-highlight-color: transparent; user-select: none;
+      position: relative;
+      overflow: hidden;
     }
-    .step-card:active { transform: scale(0.97); }
-    .step-card.done { background: var(--card-done-bg); opacity: 0.65; }
-    .step-card.animating { transform: scale(0.96); }
+    .step-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, var(--surface-highlight) 50%, transparent 100%);
+      opacity: 0;
+      transform: translateX(-120%);
+    }
+    .step-card.entering {
+      animation: card-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .step-card:active { transform: scale(0.98); }
+    .step-card.done {
+      background: var(--card-done-bg);
+      opacity: 0.72;
+      transform: scale(0.985);
+      box-shadow: none;
+    }
+    .step-card.done .step-body {
+      transform: translateY(1px);
+    }
+    .step-card.animating {
+      transform: scale(0.97);
+      box-shadow: 0 0 0 1px var(--card-border), 0 10px 28px var(--accent-glow);
+    }
+    .step-card.animating::before {
+      opacity: 1;
+      animation: sheen-sweep 0.45s ease;
+    }
+    @keyframes sheen-sweep {
+      from { transform: translateX(-120%); }
+      to { transform: translateX(120%); }
+    }
+    @keyframes card-enter {
+      from { opacity: 0; transform: translateY(16px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
     .step-check {
-      width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--accent);
+      width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--accent);
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      transition: background 0.25s ease, box-shadow 0.25s ease;
+      transition: background 0.28s ease, box-shadow 0.28s ease, transform 0.28s ease;
     }
     .step-card.done .step-check {
       background: var(--accent); border-color: var(--accent);
       box-shadow: 0 0 10px var(--accent-glow);
+      transform: scale(1.04);
     }
-    .step-check svg { opacity: 0; transition: opacity 0.2s ease; }
-    .step-card.done .step-check svg { opacity: 1; }
-    .step-body { flex: 1; min-width: 0; }
+    .step-check svg {
+      opacity: 0;
+      transform: scale(0.55);
+      transition: opacity 0.24s ease, transform 0.24s ease;
+    }
+    .step-card.done .step-check svg { opacity: 1; transform: scale(1); }
+    .step-body { flex: 1; min-width: 0; transition: transform 0.28s ease, opacity 0.28s ease; }
     .step-name {
       font-size: 0.95rem; font-weight: 600; color: var(--text-primary);
       transition: color 0.3s ease; position: relative;
@@ -185,17 +352,34 @@
       from { transform: scaleX(0); transform-origin: left; }
       to   { transform: scaleX(1); transform-origin: left; }
     }
-    .step-desc { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+    .step-desc {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      transition: opacity 0.28s ease, max-height 0.28s ease;
+      max-height: 80px;
+    }
+    .step-card.done .step-desc {
+      opacity: 0.6;
+      max-height: 28px;
+      overflow: hidden;
+    }
     .timer-btn {
       background: var(--timer-bg); border: 1px solid var(--timer-border);
       color: var(--accent); border-radius: 10px; padding: 5px 10px;
       font-size: 0.78rem; font-weight: 700; cursor: pointer; flex-shrink: 0;
-      backdrop-filter: blur(8px); transition: transform 0.1s;
+      backdrop-filter: blur(8px); transition: transform 0.1s, background 0.2s ease;
     }
     .timer-btn:active { transform: scale(0.95); }
     #timer-display {
       text-align: center; padding: 12px; font-size: 1.3rem;
       font-weight: 800; color: var(--accent); letter-spacing: 0.05em;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      margin-bottom: 8px;
     }
 
     /* ── Success Screen ── */
@@ -214,6 +398,18 @@
     .success-emoji { font-size: 4rem; margin-bottom: 12px; }
     .success-title { font-size: 1.7rem; font-weight: 800; color: var(--text-primary); }
     .success-sub { font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px; }
+    .success-halo {
+      width: 94px;
+      height: 94px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent-glow) 0%, rgba(255,255,255,0) 72%);
+      animation: halo-breathe 2.2s ease-in-out infinite;
+    }
+    @keyframes halo-breathe {
+      0%, 100% { transform: scale(0.96); opacity: 0.72; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
     .success-btn {
       margin-top: 20px; padding: 12px 28px; border-radius: 50px; border: none;
       background: var(--success-gradient); color: #fff;
@@ -485,13 +681,40 @@
     .nav-btn .nav-icon { font-size: 1.35rem; line-height: 1; transition: transform 0.2s ease; }
     .nav-btn.active { color: var(--nav-active); }
     .nav-btn.active .nav-icon { transform: scale(1.15); }
+
+    @media (max-width: 640px) {
+      .progress-ring-wrap {
+        grid-template-columns: 1fr;
+        justify-items: center;
+      }
+      .routine-meta {
+        width: 100%;
+        align-items: stretch;
+      }
+      .routine-summary {
+        grid-template-columns: 1fr 1fr;
+      }
+      .app-header {
+        padding-top: 52px;
+      }
+    }
   </style>
 </head>
 <body class="theme-pm">
+  <div class="ambient-bg" aria-hidden="true">
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-grid"></div>
+  </div>
 
   <header class="app-header">
     <h1>Protocol Tracker</h1>
     <div id="greeting-text">Good Evening, Dan 🌙</div>
+    <div id="greeting-subtext">Your evening reset is ready. Move through each step and let the app carry the momentum.</div>
+    <div class="header-glass">
+      <span class="header-chip" id="header-chip-routine">Evening ritual</span>
+      <span class="header-chip" id="header-chip-focus">Wind-down mode</span>
+    </div>
   </header>
 
   <!-- ── Routine Tab ── -->
@@ -510,12 +733,25 @@
       <div class="routine-meta">
         <span class="phase-badge" id="phase-badge">Phase 1</span>
         <span id="time-context">Loading…</span>
+        <div class="routine-summary">
+          <div class="summary-card">
+            <span class="summary-label">Remaining</span>
+            <span class="summary-value" id="summary-remaining">0</span>
+            <span class="summary-note" id="summary-remaining-note">steps to go</span>
+          </div>
+          <div class="summary-card">
+            <span class="summary-label">Completion</span>
+            <span class="summary-value" id="summary-completion">0 / 0</span>
+            <span class="summary-note" id="summary-completion-note">for this session</span>
+          </div>
+        </div>
       </div>
     </div>
     <div id="timer-display" class="hidden"></div>
     <div id="routine-container"></div>
     <div id="success-message" class="hidden">
       <div class="success-inner">
+        <div class="success-halo"></div>
         <div class="success-emoji">✨</div>
         <div class="success-title">Protocol Complete</div>
         <div class="success-sub">Every step done. Your skin thanks you.</div>
@@ -597,8 +833,4 @@
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
   </script>
 </body>
-</html>'''
-
-with open('/tmp/index.html', 'w') as f:
-    f.write(index_html)
-print(f"index.html written: {len(index_html)} chars")
+</html>
