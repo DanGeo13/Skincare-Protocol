@@ -72,30 +72,30 @@
     }
     /* ── PM Theme ── */
     body.theme-pm {
-      --bg-gradient: linear-gradient(160deg, #0d1b2a 0%, #1a1035 40%, #0f1923 100%);
-      --header-gradient: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e3a5f 100%);
+      --bg-gradient: linear-gradient(160deg, #091522 0%, #10273a 38%, #0c1d2b 100%);
+      --header-gradient: linear-gradient(135deg, #16314a 0%, #214e75 52%, #0f2438 100%);
       --card-bg: rgba(255,255,255,0.06);
-      --card-border: rgba(167,139,250,0.2);
-      --card-done-bg: rgba(167,139,250,0.08);
-      --text-primary: #e2e8f0;
-      --text-secondary: #94a3b8;
-      --text-done: #64748b;
-      --accent: #a78bfa;
-      --accent-glow: rgba(167,139,250,0.45);
-      --ring-stroke: #a78bfa;
-      --ring-bg: rgba(167,139,250,0.1);
-      --success-gradient: linear-gradient(135deg, #7c3aed, #4f46e5);
+      --card-border: rgba(112,168,214,0.18);
+      --card-done-bg: rgba(66,111,149,0.12);
+      --text-primary: #e7f1fa;
+      --text-secondary: #94aec5;
+      --text-done: #688099;
+      --accent: #74b8f2;
+      --accent-glow: rgba(116,184,242,0.28);
+      --ring-stroke: #74b8f2;
+      --ring-bg: rgba(116,184,242,0.1);
+      --success-gradient: linear-gradient(135deg, #2f7eb8, #6ec0f2);
       --nav-bg: rgba(13,27,42,0.85);
-      --nav-border: rgba(167,139,250,0.2);
-      --nav-active: #a78bfa;
-      --badge-bg: rgba(167,139,250,0.15);
-      --badge-color: #c4b5fd;
-      --timer-bg: rgba(167,139,250,0.1);
-      --timer-border: rgba(167,139,250,0.3);
+      --nav-border: rgba(112,168,214,0.16);
+      --nav-active: #d8ecff;
+      --badge-bg: rgba(116,184,242,0.14);
+      --badge-color: #d1e9ff;
+      --timer-bg: rgba(116,184,242,0.12);
+      --timer-border: rgba(116,184,242,0.24);
       --shadow: 0 8px 32px rgba(0,0,0,0.4);
       --input-bg: rgba(255,255,255,0.07);
-      --pill-active-bg: #a78bfa;
-      --pill-active-text: #0d1b2a;
+      --pill-active-bg: #74b8f2;
+      --pill-active-text: #0b1b28;
       --delete-color: #f87171;
       --surface-highlight: rgba(255,255,255,0.08);
       --hero-shadow: 0 22px 50px rgba(0,0,0,0.42);
@@ -106,8 +106,8 @@
       --header-surface: rgba(11,19,38,0.72);
       --header-border: rgba(255,255,255,0.04);
       --header-shadow: none;
-      --avatar-bg: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18), rgba(98,44,204,0.35));
-      --avatar-color: #efe7ff;
+      --avatar-bg: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18), rgba(35,97,145,0.45));
+      --avatar-color: #eef7ff;
       --glass-strong: rgba(255,255,255,0.08);
       --glass-soft: rgba(255,255,255,0.04);
       background: var(--bg-gradient);
@@ -141,7 +141,7 @@
       height: 220px;
       bottom: 12%;
       left: -80px;
-      background: radial-gradient(circle at 50% 50%, rgba(167,139,250,0.22), rgba(167,139,250,0));
+      background: radial-gradient(circle at 50% 50%, rgba(116,184,242,0.18), rgba(116,184,242,0));
       animation-delay: -4s;
     }
     .ambient-grid {
@@ -351,13 +351,13 @@
       font-family: "Manrope", sans-serif;
       font-size: 4rem;
       font-weight: 800;
-      color: #e6dcff;
+      color: #e4f3ff;
       line-height: 0.95;
       letter-spacing: -0.05em;
     }
     #progress-label {
       font-size: 0.68rem; font-weight: 600; letter-spacing: 0.36em;
-      text-transform: uppercase; color: rgba(232,223,255,0.74); margin-top: 10px;
+      text-transform: uppercase; color: rgba(206,226,244,0.72); margin-top: 10px;
     }
     .routine-meta {
       display: flex;
@@ -369,8 +369,8 @@
     }
     .phase-badge {
       background: rgba(255,255,255,0.06);
-      color: #cab7ff;
-      border: 1px solid rgba(255,255,255,0.08);
+      color: #d7ebff;
+      border: 1px solid rgba(116,184,242,0.16);
       border-radius: 999px;
       padding: 5px 12px;
       font-size: 0.72rem;
@@ -379,7 +379,7 @@
       backdrop-filter: blur(8px);
     }
     #time-context {
-      color: rgba(230,223,255,0.82);
+      color: rgba(219,234,247,0.82);
       font-size: 0.84rem;
       font-weight: 500;
       line-height: 1.55;
@@ -553,7 +553,7 @@
       font-weight: 700;
       letter-spacing: 0.18em;
       text-transform: uppercase;
-      color: rgba(232,223,255,0.54);
+      color: rgba(187,211,233,0.58);
     }
     .agenda-subtitle {
       margin-top: 7px;
@@ -562,12 +562,12 @@
       line-height: 1.15;
       font-weight: 800;
       letter-spacing: -0.04em;
-      color: #efe7ff;
+      color: #edf7ff;
     }
     .agenda-count {
       font-size: 0.92rem;
       font-weight: 700;
-      color: #e9dcff;
+      color: #cfe7fb;
       white-space: nowrap;
     }
     .agenda-list {
@@ -581,8 +581,8 @@
       grid-template-columns: 74px minmax(0, 1fr) auto;
       gap: 12px;
       align-items: start;
-      background: rgba(21,31,52,0.94);
-      border: 1px solid rgba(255,255,255,0.04);
+      background: rgba(14,30,46,0.96);
+      border: 1px solid rgba(112,168,214,0.12);
       border-radius: 28px;
       padding: 18px;
       backdrop-filter: blur(14px);
@@ -591,8 +591,8 @@
       transition: transform 0.24s ease, opacity 0.24s ease, border-color 0.24s ease;
     }
     .agenda-card.is-next {
-      border-color: rgba(110,249,188,0.2);
-      box-shadow: 0 0 0 1px rgba(110,249,188,0.18), 0 24px 44px rgba(0,0,0,0.24);
+      border-color: rgba(116,184,242,0.3);
+      box-shadow: 0 0 0 1px rgba(116,184,242,0.18), 0 24px 44px rgba(0,0,0,0.24);
     }
     .agenda-card.done {
       opacity: 0.5;
@@ -601,27 +601,27 @@
     .agenda-time {
       font-size: 0.92rem;
       font-weight: 800;
-      color: #efe7ff;
+      color: #edf7ff;
       letter-spacing: 0.03em;
     }
     .agenda-time-note {
       display: block;
       margin-top: 4px;
       font-size: 0.7rem;
-      color: rgba(229,221,255,0.54);
+      color: rgba(176,202,225,0.56);
     }
     .agenda-name {
       font-family: "Manrope", sans-serif;
       font-size: 1.04rem;
       font-weight: 800;
-      color: #f2ebff;
+      color: #eef7ff;
       letter-spacing: -0.02em;
     }
     .agenda-desc {
       margin-top: 4px;
       font-size: 0.8rem;
       line-height: 1.35;
-      color: rgba(224,215,255,0.68);
+      color: rgba(187,210,230,0.74);
     }
     .agenda-tags {
       display: flex;
@@ -638,16 +638,16 @@
       font-size: 0.68rem;
       font-weight: 700;
       background: var(--timer-bg);
-      color: #cab7ff;
-      border: 1px solid rgba(255,255,255,0.06);
+      color: #d6ecff;
+      border: 1px solid rgba(116,184,242,0.14);
     }
     .agenda-action {
       width: 34px;
       height: 34px;
       border-radius: 50%;
-      border: 1px solid rgba(201,181,255,0.35);
+      border: 1px solid rgba(116,184,242,0.28);
       background: rgba(255,255,255,0.03);
-      color: #cab7ff;
+      color: #d6ecff;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -657,9 +657,9 @@
       margin-top: 2px;
     }
     .agenda-card.done .agenda-action {
-      background: rgba(98,44,204,0.26);
-      color: #d8c8ff;
-      border-color: rgba(98,44,204,0.3);
+      background: rgba(41,103,151,0.28);
+      color: #dff1ff;
+      border-color: rgba(116,184,242,0.24);
       box-shadow: none;
     }
     .feature-card {
@@ -677,9 +677,9 @@
       gap: 14px;
       padding: 18px 18px;
       border-radius: 28px;
-      background: linear-gradient(135deg, rgba(98,44,204,0.34), rgba(208,188,255,0.12));
-      border: 1px solid rgba(161,123,255,0.34);
-      box-shadow: 0 20px 44px rgba(34,16,75,0.28);
+      background: linear-gradient(135deg, rgba(24,63,95,0.88), rgba(37,97,144,0.48));
+      border: 1px solid rgba(116,184,242,0.24);
+      box-shadow: 0 20px 44px rgba(5,16,27,0.28);
     }
     .next-panel-main {
       display: flex;
@@ -695,20 +695,20 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #d9c9ff;
+      color: #d8edff;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
     }
     .next-panel-title {
       font-family: "Manrope", sans-serif;
       font-size: 1.08rem;
       font-weight: 800;
-      color: #f1e9ff;
+      color: #eff7ff;
       letter-spacing: -0.03em;
     }
     .next-panel-subtitle {
       margin-top: 4px;
       font-size: 0.82rem;
-      color: rgba(236,228,255,0.7);
+      color: rgba(202,223,241,0.76);
     }
     .next-panel-time {
       text-align: right;
@@ -719,7 +719,7 @@
       font-family: "Manrope", sans-serif;
       font-size: 2rem;
       line-height: 0.95;
-      color: #dfd0ff;
+      color: #d9ecff;
       letter-spacing: -0.05em;
     }
     .next-panel-time span {
@@ -728,7 +728,7 @@
       font-size: 0.62rem;
       letter-spacing: 0.22em;
       text-transform: uppercase;
-      color: rgba(230,220,255,0.46);
+      color: rgba(183,206,228,0.54);
     }
     .live-focus-wrap {
       margin-top: 24px;
@@ -864,32 +864,49 @@
       margin-top: 12px;
     }
     .upcoming-card {
-      background: rgba(22,29,50,0.84);
-      border: 1px solid rgba(255,255,255,0.04);
+      background: rgba(15,29,44,0.84);
+      border: 1px solid rgba(112,168,214,0.12);
       border-radius: 22px;
       padding: 16px 18px;
       box-shadow: 0 18px 34px rgba(0,0,0,0.16);
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+      appearance: none;
     }
     .upcoming-day {
       font-size: 0.74rem;
       text-transform: uppercase;
       letter-spacing: 0.16em;
-      color: rgba(232,223,255,0.54);
+      color: rgba(183,206,228,0.58);
       font-weight: 700;
+    }
+    .upcoming-date {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
     }
     .upcoming-title {
       margin-top: 8px;
       font-family: "Manrope", sans-serif;
       font-size: 1.04rem;
       font-weight: 800;
-      color: #efe7ff;
+      color: #edf7ff;
       letter-spacing: -0.03em;
     }
     .upcoming-meta {
       margin-top: 6px;
       font-size: 0.82rem;
-      color: rgba(226,218,255,0.68);
+      color: rgba(190,212,232,0.72);
       line-height: 1.4;
+    }
+    .upcoming-card.active {
+      border-color: rgba(116,184,242,0.28);
+      box-shadow: 0 0 0 1px rgba(116,184,242,0.18), 0 18px 34px rgba(0,0,0,0.2);
+    }
+    .agenda-action:disabled {
+      opacity: 0.45;
+      cursor: default;
     }
     .floating-fab {
       position: fixed;
@@ -899,8 +916,8 @@
       height: 64px;
       border-radius: 50%;
       border: none;
-      background: radial-gradient(circle at 30% 30%, #d8c8ff, #7f54ef);
-      color: #29114e;
+      background: radial-gradient(circle at 30% 30%, #d8eeff, #2f7eb8);
+      color: #0f2435;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -924,11 +941,11 @@
     .nav-btn {
       border-radius: 20px;
       padding: 10px 0;
-      color: rgba(207,194,240,0.46);
+      color: rgba(194,215,234,0.56);
     }
     .nav-btn.active {
-      color: #d6c6ff;
-      background: rgba(98,44,204,0.18);
+      color: #dff1ff;
+      background: rgba(41,103,151,0.24);
     }
     .step-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
@@ -1655,8 +1672,8 @@
         <svg width="212" height="212" viewBox="0 0 212 212">
           <defs>
             <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#d0bcff"></stop>
-              <stop offset="100%" stop-color="#622ccc"></stop>
+              <stop offset="0%" stop-color="#b9e0ff"></stop>
+              <stop offset="100%" stop-color="#2f7eb8"></stop>
             </linearGradient>
           </defs>
           <circle id="progress-circle-bg" cx="106" cy="106" r="88"/>
@@ -1668,8 +1685,8 @@
         </div>
       </div>
       <div class="routine-meta">
-        <span class="phase-badge" id="phase-badge">Phase 1</span>
-        <span id="time-context">Your evening reset is ready. Move through each step and let the app carry the momentum.</span>
+        <span class="phase-badge" id="phase-badge">Today</span>
+        <span id="time-context">Showing today’s remaining schedule.</span>
         <div class="routine-summary">
           <div class="summary-card">
             <span class="summary-label">Remaining</span>
@@ -1690,55 +1707,31 @@
           <span class="material-symbols-outlined">bolt</span>
         </div>
         <div>
-          <div class="next-panel-title" id="next-panel-title">Next: Evening Reset</div>
-          <div class="next-panel-subtitle" id="next-panel-subtitle">Mindfulness session</div>
+          <div class="next-panel-title" id="next-panel-title">Next task</div>
+          <div class="next-panel-subtitle" id="next-panel-subtitle">Building today’s schedule</div>
         </div>
       </div>
       <div class="next-panel-time">
-        <strong id="next-panel-time">12:45</strong>
-        <span>Starts in</span>
+        <strong id="next-panel-time">--</strong>
+        <span>Scheduled</span>
       </div>
     </div>
-    <section class="live-focus-wrap">
-      <div class="live-focus-title">Current Focus</div>
-      <div class="live-focus-card" id="live-focus-card">
-        <div class="live-focus-pill">Live Now</div>
-        <div class="live-focus-head">
-          <div class="live-focus-time" id="live-focus-time">12:30 PM — Exercise</div>
-          <button class="icon-btn" type="button" aria-label="More">
-            <span class="material-symbols-outlined">more_horiz</span>
-          </button>
-        </div>
-        <div class="live-focus-meta">
-          <div class="live-focus-thumb" id="live-focus-thumb">✦</div>
-          <div>
-            <div class="live-focus-name" id="live-focus-name">Gym Session</div>
-            <div class="live-focus-desc" id="live-focus-desc">High intensity • 45 min</div>
-          </div>
-          <div class="live-focus-status" id="live-focus-status">Active</div>
-        </div>
-      </div>
-    </section>
     <div id="timer-display" class="hidden"></div>
     <section class="focus-section">
       <div class="agenda-header">
         <div>
           <div class="agenda-title">Today’s Schedule</div>
-          <div class="agenda-subtitle" id="agenda-subtitle">Tasks and routines arranged by time for this date.</div>
+          <div class="agenda-subtitle" id="agenda-subtitle">Everything remaining today, arranged by time.</div>
         </div>
         <div class="agenda-count" id="agenda-count">0 items</div>
       </div>
       <div id="routine-container" class="agenda-list"></div>
     </section>
-    <section class="insight-card">
-      <div class="insight-title">Sanctuary Insight</div>
-      <div class="insight-body" id="insight-body">Consistent evening routines lower cortisol levels and make the rest of the evening feel lighter.</div>
-    </section>
     <section class="upcoming-section">
       <div class="agenda-header">
         <div>
-          <div class="agenda-title">Upcoming</div>
-          <div class="agenda-subtitle">Next day and upcoming events</div>
+          <div class="agenda-title">Browse Days</div>
+          <div class="agenda-subtitle">Tap a day to preview what’s approaching.</div>
         </div>
       </div>
       <div class="upcoming-list" id="upcoming-list"></div>
