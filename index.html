@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Protocol Tracker</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0d1b2a" id="meta-theme-color" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <style>
@@ -17,17 +16,19 @@
       transition: background 0.8s ease, color 0.4s ease;
       padding-bottom: 90px;
     }
+
+    /* ── AM Theme ── */
     body.theme-am {
       --bg-gradient: linear-gradient(160deg, #fef9f0 0%, #fde8c8 30%, #faf0f8 100%);
       --header-gradient: linear-gradient(135deg, #ff9a5c 0%, #ffcd67 50%, #ffa8c8 100%);
-      --card-bg: rgba(255, 255, 255, 0.55);
-      --card-border: rgba(255, 180, 100, 0.25);
-      --card-done-bg: rgba(255, 220, 180, 0.35);
+      --card-bg: rgba(255,255,255,0.55);
+      --card-border: rgba(255,180,100,0.25);
+      --card-done-bg: rgba(255,220,180,0.35);
       --text-primary: #2d1b00;
       --text-secondary: #7a5c3a;
       --text-done: #b8925a;
       --accent: #f97316;
-      --accent-glow: rgba(249, 115, 22, 0.4);
+      --accent-glow: rgba(249,115,22,0.4);
       --ring-stroke: #f97316;
       --ring-bg: rgba(249,115,22,0.15);
       --success-gradient: linear-gradient(135deg, #ffa726, #ff7043);
@@ -39,24 +40,29 @@
       --timer-bg: rgba(249,115,22,0.12);
       --timer-border: rgba(249,115,22,0.3);
       --shadow: 0 8px 32px rgba(249,115,22,0.12);
+      --input-bg: rgba(255,255,255,0.7);
+      --pill-active-bg: #f97316;
+      --pill-active-text: #fff;
+      --delete-color: #dc2626;
       background: var(--bg-gradient);
       color: var(--text-primary);
     }
+    /* ── PM Theme ── */
     body.theme-pm {
       --bg-gradient: linear-gradient(160deg, #0d1b2a 0%, #1a1035 40%, #0f1923 100%);
       --header-gradient: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e3a5f 100%);
-      --card-bg: rgba(255, 255, 255, 0.06);
-      --card-border: rgba(167, 139, 250, 0.2);
-      --card-done-bg: rgba(167, 139, 250, 0.08);
+      --card-bg: rgba(255,255,255,0.06);
+      --card-border: rgba(167,139,250,0.2);
+      --card-done-bg: rgba(167,139,250,0.08);
       --text-primary: #e2e8f0;
       --text-secondary: #94a3b8;
       --text-done: #64748b;
       --accent: #a78bfa;
-      --accent-glow: rgba(167, 139, 250, 0.45);
+      --accent-glow: rgba(167,139,250,0.45);
       --ring-stroke: #a78bfa;
       --ring-bg: rgba(167,139,250,0.1);
       --success-gradient: linear-gradient(135deg, #7c3aed, #4f46e5);
-      --nav-bg: rgba(13, 27, 42, 0.85);
+      --nav-bg: rgba(13,27,42,0.85);
       --nav-border: rgba(167,139,250,0.2);
       --nav-active: #a78bfa;
       --badge-bg: rgba(167,139,250,0.15);
@@ -64,9 +70,15 @@
       --timer-bg: rgba(167,139,250,0.1);
       --timer-border: rgba(167,139,250,0.3);
       --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      --input-bg: rgba(255,255,255,0.07);
+      --pill-active-bg: #a78bfa;
+      --pill-active-text: #0d1b2a;
+      --delete-color: #f87171;
       background: var(--bg-gradient);
       color: var(--text-primary);
     }
+
+    /* ── Header ── */
     .app-header {
       background: var(--header-gradient);
       padding: 56px 20px 24px;
@@ -76,64 +88,50 @@
     }
     .app-header::before {
       content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg,rgba(255,255,255,0.08) 0%,transparent 100%);
     }
     .app-header h1 {
-      font-size: 1.2rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.85);
-      position: relative;
+      font-size: 1.1rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: rgba(255,255,255,0.85); position: relative;
     }
     #greeting-text {
-      font-size: 1.9rem;
-      font-weight: 800;
-      color: #fff;
-      margin-top: 4px;
-      position: relative;
+      font-size: 1.8rem; font-weight: 800; color: #fff; margin-top: 4px; position: relative;
     }
+
+    /* ── Progress Ring ── */
     .progress-ring-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 24px 20px 8px;
+      display: flex; flex-direction: column; align-items: center; padding: 24px 20px 8px;
     }
-    .ring-container {
-      position: relative;
-      width: 130px;
-      height: 130px;
-    }
+    .ring-container { position: relative; width: 130px; height: 130px; }
     .ring-container svg {
       transform: rotate(-90deg);
       filter: drop-shadow(0 0 10px var(--accent-glow));
       transition: filter 0.4s ease;
     }
-    .ring-container svg.ring-complete {
-      animation: ring-pulse 1.5s ease-in-out infinite;
-    }
+    .ring-container svg.ring-complete { animation: ring-pulse 1.5s ease-in-out infinite; }
     @keyframes ring-pulse {
-      0%, 100% { filter: drop-shadow(0 0 10px var(--accent-glow)) drop-shadow(0 0 20px var(--accent-glow)); }
-      50%       { filter: drop-shadow(0 0 25px var(--accent-glow)) drop-shadow(0 0 50px var(--accent-glow)); }
+      0%,100% { filter: drop-shadow(0 0 10px var(--accent-glow)) drop-shadow(0 0 20px var(--accent-glow)); }
+      50%      { filter: drop-shadow(0 0 25px var(--accent-glow)) drop-shadow(0 0 50px var(--accent-glow)); }
     }
     #progress-circle-bg { fill: none; stroke: var(--ring-bg); stroke-width: 8; }
     #progress-circle {
-      fill: none;
-      stroke: var(--ring-stroke);
-      stroke-width: 8;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      fill: none; stroke: var(--ring-stroke); stroke-width: 8; stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s cubic-bezier(0.4,0,0.2,1);
     }
     .ring-center {
-      position: absolute; inset: 0;
-      display: flex; flex-direction: column;
+      position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
     }
     #progress-text { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
-    #progress-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); margin-top: 2px; }
-    .routine-meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+    #progress-label {
+      font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-secondary); margin-top: 2px;
+    }
+    .routine-meta {
+      display: flex; align-items: center; gap: 10px; margin-top: 12px;
+      flex-wrap: wrap; justify-content: center;
+    }
     .phase-badge {
       background: var(--badge-bg); color: var(--badge-color);
       border: 1px solid var(--card-border); border-radius: 20px;
@@ -141,11 +139,14 @@
       letter-spacing: 0.05em; backdrop-filter: blur(8px);
     }
     #time-context { color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; }
+
+    /* ── Tabs ── */
     .tab-content { padding: 0 16px; }
     .hidden { display: none !important; }
+
+    /* ── Step Cards (Routine) ── */
     .step-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
+      background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: 16px; padding: 14px 16px; margin-bottom: 10px;
       backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       box-shadow: var(--shadow);
@@ -158,10 +159,9 @@
     .step-card.done { background: var(--card-done-bg); opacity: 0.65; }
     .step-card.animating { transform: scale(0.96); }
     .step-check {
-      width: 26px; height: 26px; border-radius: 50%;
-      border: 2px solid var(--accent);
+      width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--accent);
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      transition: background 0.25s ease, box-shadow 0.25s ease;
     }
     .step-card.done .step-check {
       background: var(--accent); border-color: var(--accent);
@@ -170,7 +170,10 @@
     .step-check svg { opacity: 0; transition: opacity 0.2s ease; }
     .step-card.done .step-check svg { opacity: 1; }
     .step-body { flex: 1; min-width: 0; }
-    .step-name { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); transition: color 0.3s ease; position: relative; }
+    .step-name {
+      font-size: 0.95rem; font-weight: 600; color: var(--text-primary);
+      transition: color 0.3s ease; position: relative;
+    }
     .step-card.done .step-name { color: var(--text-done); }
     .step-card.done .step-name::after {
       content: ''; position: absolute; left: 0; top: 50%;
@@ -187,21 +190,22 @@
       background: var(--timer-bg); border: 1px solid var(--timer-border);
       color: var(--accent); border-radius: 10px; padding: 5px 10px;
       font-size: 0.78rem; font-weight: 700; cursor: pointer; flex-shrink: 0;
-      backdrop-filter: blur(8px); transition: background 0.2s, transform 0.1s;
+      backdrop-filter: blur(8px); transition: transform 0.1s;
     }
     .timer-btn:active { transform: scale(0.95); }
     #timer-display {
-      text-align: center; padding: 12px;
-      font-size: 1.3rem; font-weight: 800;
-      color: var(--accent); letter-spacing: 0.05em;
+      text-align: center; padding: 12px; font-size: 1.3rem;
+      font-weight: 800; color: var(--accent); letter-spacing: 0.05em;
     }
+
+    /* ── Success Screen ── */
     #success-message { text-align: center; padding: 40px 20px; }
     .success-inner {
       background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: 24px; padding: 40px 24px;
       backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.1);
-      animation: success-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      animation: success-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
     }
     @keyframes success-pop {
       from { opacity: 0; transform: scale(0.85); }
@@ -214,44 +218,255 @@
       margin-top: 20px; padding: 12px 28px; border-radius: 50px; border: none;
       background: var(--success-gradient); color: #fff;
       font-size: 0.9rem; font-weight: 700; cursor: pointer;
-      box-shadow: 0 4px 20px var(--accent-glow);
-      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px var(--accent-glow); transition: transform 0.15s;
     }
     .success-btn:active { transform: scale(0.96); }
+
+    /* ── History ── */
     .history-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: 16px; padding: 16px; margin-bottom: 10px;
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px); box-shadow: var(--shadow);
     }
     .history-date { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; color: var(--text-primary); }
     .history-row { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; }
     .history-bar-wrap { background: var(--ring-bg); border-radius: 6px; height: 6px; margin-top: 4px; overflow: hidden; }
     .history-bar { height: 100%; border-radius: 6px; background: var(--accent); transition: width 0.5s ease; }
-    #view-history h2, #view-settings h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; margin-top: 20px; }
+    #view-history h2, #view-settings h2 {
+      font-size: 1.1rem; font-weight: 700; color: var(--text-primary);
+      margin-bottom: 6px; margin-top: 20px;
+    }
+
+    /* ── Settings: Section Label ── */
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-secondary); padding: 18px 0 8px;
+    }
+
+    /* ── Pill Row (Phase / Routine Type pickers) ── */
+    .pill-row {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+    }
+    .pill-btn {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      color: var(--text-secondary); border-radius: 20px; padding: 6px 14px;
+      font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      backdrop-filter: blur(8px); -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .pill-btn:active { transform: scale(0.95); }
+    .pill-btn.active {
+      background: var(--pill-active-bg); color: var(--pill-active-text);
+      border-color: var(--pill-active-bg);
+      box-shadow: 0 2px 10px var(--accent-glow);
+    }
+    .pill-btn.add-pill {
+      background: transparent; border-style: dashed;
+      color: var(--accent);
+    }
+
+    /* ── Editor Step Cards ── */
+    .editor-step-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 14px; margin-bottom: 8px;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow); overflow: hidden;
+    }
+    .editor-step-main {
+      display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    }
+    .editor-drag {
+      color: var(--text-secondary); font-size: 1.1rem;
+      cursor: grab; flex-shrink: 0; padding: 0 2px;
+      opacity: 0.5;
+    }
+    .editor-name-input {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--text-primary); font-size: 0.92rem; font-weight: 500;
+      font-family: inherit; min-width: 0;
+    }
+    .editor-name-input::placeholder { color: var(--text-secondary); }
+    .editor-expand-btn {
+      background: var(--timer-bg); border: 1px solid var(--timer-border);
+      color: var(--text-secondary); border-radius: 8px;
+      width: 28px; height: 28px; display: flex; align-items: center;
+      justify-content: center; font-size: 0.85rem; cursor: pointer;
+      flex-shrink: 0; transition: background 0.2s, color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .editor-expand-btn.has-extras {
+      background: var(--badge-bg); color: var(--accent);
+      border-color: var(--accent);
+    }
+    .editor-delete-btn {
+      background: none; border: none; color: var(--delete-color);
+      font-size: 1rem; cursor: pointer; flex-shrink: 0;
+      width: 28px; height: 28px; display: flex; align-items: center;
+      justify-content: center; border-radius: 8px;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.2s;
+    }
+    .editor-delete-btn:active { background: rgba(220,38,38,0.1); }
+
+    .editor-step-extras {
+      border-top: 1px solid var(--card-border);
+      padding: 10px 12px 12px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .editor-desc-input {
+      width: 100%; background: var(--input-bg);
+      border: 1px solid var(--card-border); border-radius: 10px;
+      color: var(--text-primary); font-size: 0.82rem; font-family: inherit;
+      padding: 8px 10px; resize: none; min-height: 60px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .editor-desc-input:focus { border-color: var(--accent); }
+    .editor-desc-input::placeholder { color: var(--text-secondary); }
+
+    .editor-timer-row {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .editor-timer-label {
+      font-size: 0.78rem; color: var(--text-secondary); font-weight: 600;
+      flex-shrink: 0;
+    }
+    .editor-timer-input {
+      width: 52px; background: var(--input-bg);
+      border: 1px solid var(--card-border); border-radius: 8px;
+      color: var(--text-primary); font-size: 0.88rem; font-weight: 600;
+      font-family: inherit; padding: 5px 8px; text-align: center; outline: none;
+      transition: border-color 0.2s;
+    }
+    .editor-timer-input:focus { border-color: var(--accent); }
+    .editor-timer-sep {
+      font-size: 0.75rem; color: var(--text-secondary); flex-shrink: 0;
+    }
+    .editor-timer-clear {
+      font-size: 0.72rem; color: var(--text-secondary); background: none;
+      border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+      transition: color 0.2s;
+    }
+    .editor-timer-clear:hover { color: var(--delete-color); }
+
+    /* ── Modifier Cards ── */
+    .editor-modifier-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 14px; padding: 12px; margin-bottom: 8px;
+      backdrop-filter: blur(12px); box-shadow: var(--shadow);
+    }
+    .editor-modifier-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .editor-day-select {
+      background: var(--input-bg); border: 1px solid var(--card-border);
+      border-radius: 10px; color: var(--text-primary); font-size: 0.82rem;
+      font-family: inherit; padding: 6px 8px; outline: none;
+      flex-shrink: 0; transition: border-color 0.2s;
+    }
+    .editor-day-select:focus { border-color: var(--accent); }
+
+    /* ── Add Step Button ── */
+    .add-step-btn {
+      width: 100%; padding: 12px; border-radius: 12px; margin-top: 4px;
+      background: var(--card-bg); border: 1.5px dashed var(--card-border);
+      color: var(--accent); font-size: 0.9rem; font-weight: 700;
+      cursor: pointer; backdrop-filter: blur(8px);
+      transition: background 0.2s, border-color 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .add-step-btn:active { transform: scale(0.98); }
+
+    /* ── Phase Settings Card ── */
     .settings-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
-      border-radius: 16px; padding: 20px; margin-bottom: 14px;
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      box-shadow: var(--shadow);
+      border-radius: 16px; padding: 16px; margin-bottom: 12px;
+      backdrop-filter: blur(12px); box-shadow: var(--shadow);
     }
-    .settings-card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 14px; }
-    .settings-card label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; margin-top: 12px; }
-    .settings-card input, .settings-card textarea {
-      width: 100%; padding: 10px 12px; border-radius: 10px;
-      border: 1px solid var(--card-border);
-      background: rgba(255,255,255,0.06); color: var(--text-primary);
-      font-size: 0.85rem; font-family: "SF Mono", "Fira Code", monospace;
-      resize: vertical; transition: border-color 0.2s;
+    .settings-row {
+      display: flex; gap: 12px;
     }
-    .settings-card input:focus, .settings-card textarea:focus { outline: none; border-color: var(--accent); }
-    .settings-btn {
-      width: 100%; margin-top: 14px; padding: 13px; border-radius: 12px; border: none;
-      background: var(--success-gradient); color: #fff;
-      font-size: 0.95rem; font-weight: 700; cursor: pointer;
-      box-shadow: 0 4px 20px var(--accent-glow); transition: transform 0.15s;
+    .settings-row > div { flex: 1; }
+    .settings-card label {
+      display: block; font-size: 0.75rem; color: var(--text-secondary);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 5px;
     }
-    .settings-btn:active { transform: scale(0.98); }
+    .settings-card input {
+      width: 100%; padding: 9px 12px; border-radius: 10px;
+      border: 1px solid var(--card-border); background: var(--input-bg);
+      color: var(--text-primary); font-size: 0.9rem; font-family: inherit;
+      outline: none; transition: border-color 0.2s;
+    }
+    .settings-card input:focus { border-color: var(--accent); }
+
+    /* ── Advanced JSON (details) ── */
+    .json-details {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 16px; margin-bottom: 20px;
+      backdrop-filter: blur(12px); box-shadow: var(--shadow);
+    }
+    .json-details summary {
+      font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; list-style: none; display: flex;
+      align-items: center; gap: 6px;
+    }
+    .json-details summary::before { content: '▶'; font-size: 0.6rem; transition: transform 0.2s; }
+    .json-details[open] summary::before { transform: rotate(90deg); }
+    .json-details textarea {
+      width: 100%; margin-top: 12px; padding: 10px; border-radius: 10px;
+      border: 1px solid var(--card-border); background: var(--input-bg);
+      color: var(--text-primary); font-size: 0.78rem;
+      font-family: "SF Mono", "Fira Code", monospace;
+      resize: vertical; min-height: 160px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .json-details textarea:focus { border-color: var(--accent); }
+    .json-import-btn {
+      width: 100%; margin-top: 10px; padding: 11px; border-radius: 10px;
+      border: none; background: var(--success-gradient); color: #fff;
+      font-size: 0.88rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    /* ── Save Indicator ── */
+    #save-indicator {
+      position: fixed; top: 20px; right: 16px; z-index: 999;
+      background: var(--accent); color: var(--pill-active-text);
+      padding: 7px 16px; border-radius: 20px; font-size: 0.8rem;
+      font-weight: 700; box-shadow: 0 4px 16px var(--accent-glow);
+      animation: fade-in-out 1.8s ease forwards;
+    }
+    @keyframes fade-in-out {
+      0%   { opacity: 0; transform: translateY(-8px); }
+      15%  { opacity: 1; transform: translateY(0); }
+      75%  { opacity: 1; }
+      100% { opacity: 0; transform: translateY(-4px); }
+    }
+
+    /* ── Editor Empty State ── */
+    .editor-empty {
+      text-align: center; padding: 24px 16px;
+      color: var(--text-secondary); font-size: 0.85rem;
+    }
+
+    /* ── Phase Name Input (in editor) ── */
+    .phase-name-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    }
+    .phase-name-label {
+      font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0;
+    }
+    .phase-name-input {
+      flex: 1; background: var(--input-bg); border: 1px solid var(--card-border);
+      border-radius: 10px; color: var(--text-primary); font-size: 0.88rem;
+      font-family: inherit; padding: 7px 10px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .phase-name-input:focus { border-color: var(--accent); }
+
+    /* ── Bottom Nav ── */
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
       background: var(--nav-bg); border-top: 1px solid var(--nav-border);
@@ -273,11 +488,13 @@
   </style>
 </head>
 <body class="theme-pm">
+
   <header class="app-header">
     <h1>Protocol Tracker</h1>
     <div id="greeting-text">Good Evening, Dan 🌙</div>
   </header>
 
+  <!-- ── Routine Tab ── -->
   <div id="view-routine" class="tab-content">
     <div class="progress-ring-wrap">
       <div class="ring-container">
@@ -307,32 +524,66 @@
     </div>
   </div>
 
+  <!-- ── History Tab ── -->
   <div id="view-history" class="tab-content hidden">
     <h2>History</h2>
     <div id="history-container"></div>
   </div>
 
+  <!-- ── Settings Tab ── -->
   <div id="view-settings" class="tab-content hidden">
-    <h2>Settings</h2>
-    <div class="settings-card">
-      <h3>Phase Tracking</h3>
-      <label>Protocol Start Date</label>
-      <input type="date" id="set-start-date" />
-      <label>Days Per Phase</label>
-      <input type="number" id="set-phase-days" min="1" max="90" />
+
+    <div class="section-label">Protocol Editor</div>
+
+    <!-- Phase picker -->
+    <div class="pill-row" id="phase-picker"></div>
+
+    <!-- Phase name editor -->
+    <div class="phase-name-row">
+      <span class="phase-name-label">Phase name</span>
+      <input class="phase-name-input" id="phase-name-input" type="text" placeholder="e.g. Phase 1 (Right Now)" oninput="savePhaseNameDebounced()"/>
     </div>
+
+    <!-- Routine type picker -->
+    <div class="pill-row" id="routine-type-picker"></div>
+
+    <!-- Step list -->
+    <div id="step-editor-list"></div>
+
+    <!-- Add step / modifier button -->
+    <button class="add-step-btn" id="add-step-btn" onclick="addEditorItem()">＋ Add Step</button>
+
+    <!-- Phase settings -->
+    <div class="section-label" style="margin-top:8px">Phase Settings</div>
     <div class="settings-card">
-      <h3>Custom Protocol (JSON)</h3>
-      <textarea id="set-protocol-json" rows="12"></textarea>
-      <button class="settings-btn" onclick="saveSettings()">Save Settings</button>
+      <div class="settings-row">
+        <div>
+          <label>Start Date</label>
+          <input type="date" id="set-start-date" onchange="savePhaseSettings()"/>
+        </div>
+        <div>
+          <label>Days / Phase</label>
+          <input type="number" id="set-phase-days" min="1" max="90" onchange="savePhaseSettings()"/>
+        </div>
+      </div>
     </div>
+
+    <!-- Advanced JSON -->
+    <div class="section-label">Advanced</div>
+    <details class="json-details">
+      <summary>Export / Import JSON</summary>
+      <textarea id="set-protocol-json" rows="10" placeholder="Paste JSON here to import…"></textarea>
+      <button class="json-import-btn" onclick="importFromJSON()">⬆ Import from JSON</button>
+    </details>
+
   </div>
 
+  <!-- Bottom Nav -->
   <nav class="bottom-nav">
-    <button class="nav-btn active" id="nav-routine" onclick="switchTab('routine')">
+    <button class="nav-btn active" id="nav-routine"  onclick="switchTab('routine')">
       <span class="nav-icon">🌿</span>Routine
     </button>
-    <button class="nav-btn" id="nav-history" onclick="switchTab('history')">
+    <button class="nav-btn" id="nav-history"  onclick="switchTab('history')">
       <span class="nav-icon">📋</span>History
     </button>
     <button class="nav-btn" id="nav-settings" onclick="switchTab('settings')">
@@ -346,4 +597,8 @@
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
   </script>
 </body>
-</html>
+</html>'''
+
+with open('/tmp/index.html', 'w') as f:
+    f.write(index_html)
+print(f"index.html written: {len(index_html)} chars")
