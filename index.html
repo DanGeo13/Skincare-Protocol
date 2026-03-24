@@ -156,12 +156,25 @@
       margin-bottom: 4px;
     }
     .next-task-value {
-      display: block;
-      font-size: 1.8rem;
-      line-height: 0.95;
-      font-weight: 800;
-      color: rgba(255,255,255,0.84);
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 6px;
+      min-height: 1.9rem;
       font-variant-numeric: tabular-nums;
+    }
+    .next-task-number {
+      font-size: 2.5rem;
+      line-height: 0.92;
+      font-weight: 800;
+      color: rgba(255,255,255,0.96);
+      letter-spacing: -0.06em;
+    }
+    .next-task-unit {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.68);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
     .next-task-note {
       display: block;
@@ -790,6 +803,43 @@
       font-size: 76px;
       color: rgba(255,255,255,0.08);
     }
+    .upcoming-section {
+      margin-top: 22px;
+    }
+    .upcoming-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .upcoming-card {
+      background: rgba(22,29,50,0.84);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 22px;
+      padding: 16px 18px;
+      box-shadow: 0 18px 34px rgba(0,0,0,0.16);
+    }
+    .upcoming-day {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: rgba(232,223,255,0.54);
+      font-weight: 700;
+    }
+    .upcoming-title {
+      margin-top: 8px;
+      font-family: "Manrope", sans-serif;
+      font-size: 1.04rem;
+      font-weight: 800;
+      color: #efe7ff;
+      letter-spacing: -0.03em;
+    }
+    .upcoming-meta {
+      margin-top: 6px;
+      font-size: 0.82rem;
+      color: rgba(226,218,255,0.68);
+      line-height: 1.4;
+    }
     .floating-fab {
       position: fixed;
       right: 20px;
@@ -1400,7 +1450,13 @@
         padding: 8px 10px;
       }
       .next-task-value {
-        font-size: 1.35rem;
+        min-height: 1.4rem;
+      }
+      .next-task-number {
+        font-size: 1.9rem;
+      }
+      .next-task-unit {
+        font-size: 0.62rem;
       }
       .ring-container { width: 188px; height: 188px; }
       #progress-text { font-size: 3.25rem; }
@@ -1419,7 +1475,10 @@
 <body class="theme-pm">
   <div class="next-task-chip" aria-live="polite">
     <span class="next-task-label">Next Task</span>
-    <span class="next-task-value" id="next-task-countdown">--:--</span>
+    <span class="next-task-value" id="next-task-countdown">
+      <span class="next-task-number">--</span>
+      <span class="next-task-unit"></span>
+    </span>
     <span class="next-task-note" id="next-task-note">Building today’s schedule</span>
   </div>
   <div class="ambient-bg" aria-hidden="true">
@@ -1527,6 +1586,15 @@
     <section class="insight-card">
       <div class="insight-title">Sanctuary Insight</div>
       <div class="insight-body" id="insight-body">Consistent evening routines lower cortisol levels and make the rest of the evening feel lighter.</div>
+    </section>
+    <section class="upcoming-section">
+      <div class="agenda-header">
+        <div>
+          <div class="agenda-title">Upcoming</div>
+          <div class="agenda-subtitle">Next day and upcoming events</div>
+        </div>
+      </div>
+      <div class="upcoming-list" id="upcoming-list"></div>
     </section>
     <div id="success-message" class="hidden">
       <div class="success-inner">
