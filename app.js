@@ -1,10 +1,19 @@
 // app.js
 
-let protocolData = JSON.parse(localStorage.getItem('customProtocol')) || DEFAULT_PROTOCOL;
-let historyLog    = JSON.parse(localStorage.getItem('skincareHistory')) || {};
+function readJsonStorage(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+let protocolData = readJsonStorage('customProtocol', DEFAULT_PROTOCOL);
+let historyLog   = readJsonStorage('skincareHistory', {});
 let settings = {
   startDate: localStorage.getItem('startDate') || new Date().toISOString().split('T')[0],
-  phaseDays: parseInt(localStorage.getItem('phaseDays')) || 14
+  phaseDays: parseInt(localStorage.getItem('phaseDays'), 10) || 14
 };
 
 let timerInterval = null;
@@ -33,13 +42,76 @@ function switchTab(tab) {
   if (tab === 'settings') renderProtocolEditor();
 }
 
+function applyTheme(isPM) {
+  document.body.classList.toggle('theme-pm', isPM);
+  document.body.classList.toggle('theme-am', !isPM);
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.setAttribute('content', isPM ? '#1a1035' : '#fde8c8');
+  }
+}
+
+function getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek) {
+  let routineSteps = [];
+  if (!isPM) {
+    routineSteps = phaseData.AM || [];
+  } else {
+    const isRetrieveNight = ['Monday','Wednesday','Friday'].includes(dayOfWeek);
+    if (phaseNum <= 2) {
+      routineSteps = isRetrieveNight ? (phaseData.PM_A || []) : (phaseData.PM_B || []);
+    } else if (isRetrieveNight) {
+      routineSteps = phaseData.PM_A || [];
+    } else if (['Tuesday', 'Thursday'].includes(dayOfWeek)) {
+      routineSteps = phaseData.PM_B_TueThu || phaseData.PM_B || [];
+    } else if (dayOfWeek === 'Saturday') {
+      routineSteps = phaseData.PM_B_Sat || phaseData.PM_B || [];
+    } else if (dayOfWeek === 'Sunday') {
+      routineSteps = phaseData.PM_B_Sun || phaseData.PM_B || [];
+    } else {
+      routineSteps = phaseData.PM_B || [];
+    }
+  }
+
+  if (isPM && phaseData.Modifiers && phaseData.Modifiers[dayOfWeek]) {
+    routineSteps = [...routineSteps, phaseData.Modifiers[dayOfWeek]];
+  }
+
+  return routineSteps;
+}
+
+function updateRoutineHeader(isPM, dayOfWeek, total, doneCount, percent) {
+  const chipRoutine = document.getElementById('header-chip-routine');
+  const chipFocus = document.getElementById('header-chip-focus');
+  const subtext = document.getElementById('greeting-subtext');
+  const remaining = Math.max(total - doneCount, 0);
+
+  document.getElementById('greeting-text').innerText = isPM ? 'Good Evening, Dan 🌙' : 'Good Morning, Dan ☀️';
+  chipRoutine.textContent = isPM ? 'Evening ritual' : 'Morning ritual';
+  chipFocus.textContent = remaining === 0
+    ? 'Locked in'
+    : isPM ? 'Wind-down mode' : 'Fresh-start mode';
+  subtext.textContent = remaining === 0
+    ? 'Everything for this session is done. Hold the streak and enjoy the glow.'
+    : isPM
+      ? `Your ${dayOfWeek.toLowerCase()} reset is ready. ${remaining} step${remaining === 1 ? '' : 's'} left before lights-out mode.`
+      : `Start clean and stack momentum early. ${remaining} step${remaining === 1 ? '' : 's'} left to close out the morning.`;
+
+  document.getElementById('summary-remaining').innerText = String(remaining);
+  document.getElementById('summary-remaining-note').innerText = remaining === 1 ? 'step to go' : 'steps to go';
+  document.getElementById('summary-completion').innerText = `${doneCount} / ${total}`;
+  document.getElementById('summary-completion-note').innerText = percent === 100 ? 'fully complete' : `${percent}% of this session`;
+}
+
 // ══════════════════════════════════════════
 //  ROUTINE
 // ══════════════════════════════════════════
 function calculatePhase() {
-  const start    = new Date(settings.startDate);
-  const diffDays = Math.ceil(Math.abs(new Date() - start) / (1000*60*60*24));
-  let phaseNum   = Math.floor(diffDays / settings.phaseDays) + 1;
+  const start = new Date(`${settings.startDate}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffMs = Math.max(0, today - start);
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  let phaseNum = Math.floor(diffDays / settings.phaseDays) + 1;
   const maxPhase = Math.max(...Object.keys(protocolData).map(Number));
   return phaseNum > maxPhase ? maxPhase : phaseNum;
 }
@@ -74,39 +146,21 @@ function renderRoutine() {
   const isPM      = now.getHours() >= 12;
   const dayOfWeek = now.toLocaleDateString('en-AU', {weekday:'long'});
 
-  document.body.className = isPM ? 'theme-pm' : 'theme-am';
-  document.getElementById('greeting-text').innerText = isPM ? 'Good Evening, Dan 🌙' : 'Good Morning, Dan ☀️';
+  applyTheme(isPM);
 
   const phaseNum  = calculatePhase();
   const phaseData = protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
   document.getElementById('phase-badge').innerText   = phaseData.name || `Phase ${phaseNum}`;
   document.getElementById('time-context').innerText  = `${dayOfWeek} · ${isPM ? 'PM Routine' : 'AM Routine'}`;
 
-  // Determine steps array
-  let routineSteps = [];
-  if (!isPM) {
-    routineSteps = phaseData.AM || [];
-  } else {
-    const isRetrieveNight = ['Monday','Wednesday','Friday'].includes(dayOfWeek);
-    if (phaseNum <= 2) {
-      routineSteps = isRetrieveNight ? (phaseData.PM_A||[]) : (phaseData.PM_B||[]);
-    } else {
-      if (isRetrieveNight) routineSteps = phaseData.PM_A||[];
-      else if (['Tuesday','Thursday'].includes(dayOfWeek)) routineSteps = phaseData.PM_B_TueThu||phaseData.PM_B||[];
-      else if (dayOfWeek==='Saturday') routineSteps = phaseData.PM_B_Sat||phaseData.PM_B||[];
-      else if (dayOfWeek==='Sunday')   routineSteps = phaseData.PM_B_Sun||phaseData.PM_B||[];
-    }
-  }
-  if (isPM && phaseData.Modifiers && phaseData.Modifiers[dayOfWeek]) {
-    routineSteps = [...routineSteps, phaseData.Modifiers[dayOfWeek]];
-  }
+  const routineSteps = getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek);
 
-  // Progress
   const today      = getTodayKey();
   const tod        = isPM ? 'PM' : 'AM';
   const completed  = historyLog[today]?.steps?.[tod] || [];
   const total      = routineSteps.length;
   const percent    = total === 0 ? 0 : Math.round((completed.length / total) * 100);
+  updateRoutineHeader(isPM, dayOfWeek, total, completed.length, percent);
 
   const circle       = document.getElementById('progress-circle');
   const radius       = circle.r.baseVal.value;
@@ -130,19 +184,25 @@ function renderRoutine() {
   successMsg.classList.add('hidden');
   container.innerHTML = '';
 
-  routineSteps.forEach((step, i) => {
+  const stepEntries = routineSteps.map((step, i) => ({
+    step,
+    index: i,
+    isDone: completed.includes(i)
+  })).sort((a, b) => Number(a.isDone) - Number(b.isDone) || a.index - b.index);
+
+  stepEntries.forEach(({ step, index, isDone }, displayIndex) => {
     const isObj  = typeof step === 'object';
     const name   = isObj ? step.name : step;
-    const isDone = completed.includes(i);
     const desc   = isObj && step.desc   ? step.desc   : null;
     const timer  = isObj && step.timer  ? step.timer  : null;
 
     const card = document.createElement('div');
-    card.className = `step-card${isDone ? ' done' : ''}`;
+    card.className = `step-card entering${isDone ? ' done' : ''}`;
+    card.style.animationDelay = `${displayIndex * 45}ms`;
     card.onclick = () => {
       card.classList.add('animating');
       setTimeout(() => card.classList.remove('animating'), 180);
-      toggleStep(i, total, isPM);
+      toggleStep(index, total, isPM);
     };
     card.innerHTML = `
       <div class="step-check">
@@ -157,6 +217,9 @@ function renderRoutine() {
       ${timer ? `<button class="timer-btn" onclick="startTimer(event,${timer})">⏱ ${fmtTime(timer)}</button>` : ''}
     `;
     container.appendChild(card);
+    requestAnimationFrame(() => {
+      card.classList.remove('entering');
+    });
   });
 }
 
@@ -500,7 +563,7 @@ function showSavedIndicator() {
 // ══════════════════════════════════════════
 function savePhaseSettings() {
   settings.startDate = document.getElementById('set-start-date').value;
-  settings.phaseDays = parseInt(document.getElementById('set-phase-days').value) || 14;
+  settings.phaseDays = parseInt(document.getElementById('set-phase-days').value, 10) || 14;
   localStorage.setItem('startDate', settings.startDate);
   localStorage.setItem('phaseDays', settings.phaseDays);
   showSavedIndicator();
@@ -531,8 +594,3 @@ function escHtml(str) {
 
 // Init
 renderRoutine();
-'''
-
-with open('/tmp/app.js', 'w') as f:
-    f.write(app_js)
-print(f"app.js written: {len(app_js)} chars")
