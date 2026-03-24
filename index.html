@@ -271,6 +271,117 @@
     #routine-container {
       padding-top: 10px;
     }
+    .focus-section {
+      padding: 8px 0 4px;
+    }
+    .focus-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 12px 4px 10px;
+    }
+    .focus-section-title {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+    .focus-section-sub {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .focus-empty {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 16px;
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+    .focus-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .focus-card {
+      display: grid;
+      grid-template-columns: 70px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 14px;
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+    }
+    .focus-time {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.03em;
+    }
+    .focus-duration {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+    .focus-name {
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .focus-desc {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+    .focus-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .focus-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      background: var(--timer-bg);
+      color: var(--accent);
+      border: 1px solid var(--timer-border);
+    }
+    .focus-toggle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--timer-border);
+      background: var(--timer-bg);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .focus-card.done {
+      opacity: 0.72;
+    }
+    .focus-card.done .focus-toggle {
+      background: var(--accent);
+      color: var(--pill-active-text);
+      border-color: var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
     .step-card {
       background: var(--card-bg); border: 1px solid var(--card-border);
       border-radius: 20px; padding: 14px 16px; margin-bottom: 10px;
@@ -561,6 +672,80 @@
       flex-shrink: 0; transition: border-color 0.2s;
     }
     .editor-day-select:focus { border-color: var(--accent); }
+    .focus-editor-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+    .focus-editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 120px 100px;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .focus-editor-grid input,
+    .focus-editor-grid select,
+    .focus-editor-card textarea {
+      width: 100%;
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      color: var(--text-primary);
+      font-size: 0.84rem;
+      font-family: inherit;
+      padding: 8px 10px;
+      outline: none;
+    }
+    .focus-editor-card textarea {
+      min-height: 64px;
+      resize: vertical;
+      margin-bottom: 8px;
+    }
+    .focus-editor-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .focus-days {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .focus-day-pill {
+      border: 1px solid var(--card-border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: auto;
+    }
+    .focus-day-pill.active {
+      background: var(--pill-active-bg);
+      color: var(--pill-active-text);
+      border-color: var(--pill-active-bg);
+    }
+    .focus-flags {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .focus-add-btn {
+      width: 100%;
+      margin-top: 6px;
+    }
 
     /* ── Add Step Button ── */
     .add-step-btn {
@@ -650,6 +835,45 @@
     .phase-name-row {
       display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
     }
+    .editor-context-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+    .editor-context-label {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .editor-context-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .editor-context-value {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .editor-context-btn {
+      border: 1px solid var(--card-border);
+      background: var(--timer-bg);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
     .phase-name-label {
       font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);
       text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0;
@@ -696,6 +920,10 @@
       }
       .app-header {
         padding-top: 52px;
+      }
+      .focus-editor-grid,
+      .focus-card {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -749,6 +977,15 @@
     </div>
     <div id="timer-display" class="hidden"></div>
     <div id="routine-container"></div>
+    <section class="focus-section">
+      <div class="focus-section-header">
+        <div>
+          <div class="focus-section-title">Daily Focus Blocks</div>
+          <div class="focus-section-sub">Exercise, mindfulness, and repeating commitments scheduled around your routine.</div>
+        </div>
+      </div>
+      <div id="focus-timeline"></div>
+    </section>
     <div id="success-message" class="hidden">
       <div class="success-inner">
         <div class="success-halo"></div>
@@ -770,6 +1007,14 @@
   <div id="view-settings" class="tab-content hidden">
 
     <div class="section-label">Protocol Editor</div>
+
+    <div class="editor-context-card">
+      <span class="editor-context-label">Live right now</span>
+      <div class="editor-context-main">
+        <span class="editor-context-value" id="editor-live-context">Loading current routine…</span>
+        <button class="editor-context-btn" onclick="syncEditorToCurrentRoutine()">Edit Live Routine</button>
+      </div>
+    </div>
 
     <!-- Phase picker -->
     <div class="pill-row" id="phase-picker"></div>
@@ -803,6 +1048,10 @@
         </div>
       </div>
     </div>
+
+    <div class="section-label">Focus Planner</div>
+    <div id="focus-editor-list"></div>
+    <button class="add-step-btn focus-add-btn" onclick="addFocusItem()">＋ Add Focus Block</button>
 
     <!-- Advanced JSON -->
     <div class="section-label">Advanced</div>
