@@ -237,6 +237,30 @@ function formatCountdown(ms) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function formatNextTaskDisplay(ms) {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  const hours = totalMinutes / 60;
+
+  if (hours >= 3) {
+    return {
+      number: String(Math.floor(hours)),
+      unit: ''
+    };
+  }
+
+  if (totalMinutes >= 60) {
+    return {
+      number: String(Math.floor(hours)),
+      unit: `${totalMinutes % 60}m`
+    };
+  }
+
+  return {
+    number: String(totalMinutes),
+    unit: 'minutes'
+  };
+}
+
 function generateTodayFocusBlocks(dayOfWeek) {
   const todaysItems = focusPlanner
     .filter(item => item.days.includes(dayOfWeek) && item.name.trim())
@@ -373,6 +397,8 @@ function buildTodayAgenda(phaseNum, phaseData, dayOfWeek) {
 
 function startNextTaskCountdown(agenda) {
   const countdownEl = document.getElementById('next-task-countdown');
+  const countdownNumberEl = countdownEl?.querySelector('.next-task-number');
+  const countdownUnitEl = countdownEl?.querySelector('.next-task-unit');
   const noteEl = document.getElementById('next-task-note');
   const panelTimeEl = document.getElementById('next-panel-time');
   if (nextTaskInterval) clearInterval(nextTaskInterval);
@@ -383,7 +409,8 @@ function startNextTaskCountdown(agenda) {
     const nextItem = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes);
 
     if (!nextItem) {
-      countdownEl.innerText = '00:00';
+      if (countdownNumberEl) countdownNumberEl.innerText = '--';
+      if (countdownUnitEl) countdownUnitEl.innerText = '';
       noteEl.innerText = 'Nothing else scheduled today';
       if (panelTimeEl) panelTimeEl.innerText = 'Done';
       return;
@@ -392,14 +419,70 @@ function startNextTaskCountdown(agenda) {
     const target = new Date();
     const startMinutes = toMinutes(nextItem.scheduledStart);
     target.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
-    const countdown = formatCountdown(target - now);
-    countdownEl.innerText = countdown;
+    const countdownMs = target - now;
+    const countdown = formatNextTaskDisplay(countdownMs);
+    if (countdownNumberEl) countdownNumberEl.innerText = countdown.number;
+    if (countdownUnitEl) countdownUnitEl.innerText = countdown.unit;
     noteEl.innerText = `${formatClock(nextItem.scheduledStart)} · ${nextItem.name}`;
-    if (panelTimeEl) panelTimeEl.innerText = countdown;
+    if (panelTimeEl) panelTimeEl.innerText = formatCountdown(countdownMs);
   }
 
   renderCountdown();
   nextTaskInterval = setInterval(renderCountdown, 1000);
+}
+
+function getDateKey(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().split('T')[0];
+}
+
+function getWeekdayForOffset(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toLocaleDateString('en-AU', { weekday: 'long' });
+}
+
+function buildUpcomingPreview(daysAhead = 3) {
+  const previews = [];
+  for (let offset = 1; offset <= daysAhead; offset++) {
+    const dayOfWeek = getWeekdayForOffset(offset);
+    const phaseNum = calculatePhase();
+    const phaseData = protocolData[String(phaseNum)] || protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
+    const focusBlocks = generateTodayFocusBlocks(dayOfWeek);
+    const morningSteps = getRoutineSteps(phaseNum, phaseData, false, dayOfWeek);
+    const eveningSteps = getRoutineSteps(phaseNum, phaseData, true, dayOfWeek);
+    const firstFocus = focusBlocks[0];
+    const firstMorning = morningSteps[0];
+    const firstEvening = eveningSteps[0];
+
+    previews.push({
+      label: offset === 1 ? 'Tomorrow' : dayOfWeek,
+      title: firstFocus?.name || firstMorning?.name || firstEvening?.name || 'No events yet',
+      meta: firstFocus
+        ? `${formatClock(firstFocus.scheduledStart)} · ${firstFocus.category}`
+        : firstMorning
+          ? 'Morning ritual scheduled'
+          : firstEvening
+            ? 'Evening ritual scheduled'
+            : 'Nothing planned yet',
+      count: focusBlocks.length + morningSteps.length + eveningSteps.length
+    });
+  }
+  return previews;
+}
+
+function renderUpcomingPreview() {
+  const container = document.getElementById('upcoming-list');
+  if (!container) return;
+  const previews = buildUpcomingPreview(3);
+  container.innerHTML = previews.map(item => `
+    <div class="upcoming-card">
+      <div class="upcoming-day">${escHtml(item.label)}</div>
+      <div class="upcoming-title">${escHtml(item.title)}</div>
+      <div class="upcoming-meta">${escHtml(item.meta)}${item.count ? ` · ${item.count} items` : ''}</div>
+    </div>
+  `).join('');
 }
 
 function getAgendaPresentation(agenda, isPM) {
@@ -585,6 +668,7 @@ function renderRoutine() {
   const allAgendaDone = agenda.length > 0 && agenda.every(item => item.done);
   updateRoutineHeader(isPM, dayOfWeek, total, completed.length, percent);
   renderHeroPanels(agenda, isPM);
+  renderUpcomingPreview();
 
   const circle       = document.getElementById('progress-circle');
   const radius       = circle.r.baseVal.value;
