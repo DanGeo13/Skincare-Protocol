@@ -388,7 +388,7 @@ function renderFocusTimeline(dayOfWeek) {
 }
 
 function getSkincareAnchorMinutes(isPM) {
-  return isPM ? 20 * 60 + 30 : 7 * 60 + 30;
+  return isPM ? 20 * 60 + 30 : 6 * 60 + 30;
 }
 
 function getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay) {
