@@ -155,5 +155,21 @@
 
     <script src="protocol.js"></script>
     <script src="app.js"></script>
+    <script>
+        // ULTIMATE CACHE KILL SWITCH
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log("Service Worker Assassinated");
+                }
+            });
+            // Force reload once to clear memory
+            if (!sessionStorage.getItem('reloaded')) {
+                sessionStorage.setItem('reloaded', 'true');
+                window.location.reload(true);
+            }
+        }
+    </script>
 </body>
 </html>
