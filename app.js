@@ -31,6 +31,14 @@ document.getElementById('set-phase-days').value   = settings.phaseDays;
 //  TAB NAVIGATION
 // ══════════════════════════════════════════
 function switchTab(tab) {
+  const settingsView = document.getElementById('view-settings');
+  if (settingsView && !settingsView.classList.contains('hidden')) {
+    clearTimeout(autoSaveTimer);
+    clearTimeout(phaseNameTimeout);
+    saveEditorState();
+    flushPhaseName();
+  }
+
   ['routine','history','settings'].forEach(t => {
     document.getElementById(`view-${t}`).classList.add('hidden');
     document.getElementById(`nav-${t}`).classList.remove('active');
@@ -330,12 +338,14 @@ function selectEditorRoutine(key) {
 let phaseNameTimeout = null;
 function savePhaseNameDebounced() {
   clearTimeout(phaseNameTimeout);
-  phaseNameTimeout = setTimeout(() => {
-    if (!protocolData[editorPhase]) protocolData[editorPhase] = {};
-    protocolData[editorPhase].name = document.getElementById('phase-name-input').value.trim();
-    persistProtocol();
-    renderPhasePicker(); // update pill labels
-  }, 500);
+  phaseNameTimeout = setTimeout(flushPhaseName, 500);
+}
+
+function flushPhaseName() {
+  if (!protocolData[editorPhase]) protocolData[editorPhase] = {};
+  protocolData[editorPhase].name = document.getElementById('phase-name-input').value.trim();
+  persistProtocol();
+  renderPhasePicker();
 }
 
 // ── Add phase ──
