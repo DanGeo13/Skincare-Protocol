@@ -1,175 +1,349 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Protocol</title>
-    <link rel="manifest" href="manifest.json">
-    <style>
-        /* Base PM (Dark) Theme Variables */
-        :root {
-            --bg-grad: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            --glass-bg: rgba(30, 41, 59, 0.6);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --primary: #818cf8;
-            --accent: #38bdf8;
-            --success: #10b981;
-            --missed: #ef4444;
-        }
-        /* AM (Light) Theme Variables */
-        body.theme-am {
-            --bg-grad: linear-gradient(135deg, #fdfbfb 0%, #e2e8f0 100%);
-            --glass-bg: rgba(255, 255, 255, 0.6);
-            --glass-border: rgba(0, 0, 0, 0.1);
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --primary: #3b82f6;
-            --accent: #0ea5e9;
-        }
-
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-grad); color: var(--text-main); margin: 0; padding: 20px; padding-bottom: 100px; min-height: 100vh; transition: background 0.5s ease; }
-        h1, h2, h3 { margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
-        
-        /* Glassmorphic Cards */
-        .card { background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--glass-border); padding: 20px; border-radius: 20px; margin-bottom: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); transition: all 0.3s ease; }
-        
-        /* Header & Progress Ring */
-        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .greeting-area h2 { margin-bottom: 4px; font-size: 1.8rem; }
-        
-        .progress-container { position: relative; width: 70px; height: 70px; }
-        .progress-ring__circle-bg { stroke: var(--glass-border); fill: transparent; stroke-width: 6; }
-        .progress-ring__circle { stroke: var(--primary); fill: transparent; stroke-width: 6; stroke-dasharray: 188.4; stroke-dashoffset: 188.4; transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1); transform: rotate(-90deg); transform-origin: 50% 50%; }
-        .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 700; font-size: 0.85rem; }
-
-        /* Step & Checkbox Styling */
-        .step { display: flex; align-items: flex-start; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--glass-border); transition: all 0.3s ease; cursor: pointer; }
-        .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        
-        /* Custom Checkbox */
-        .custom-checkbox { width: 26px; height: 26px; border: 2px solid var(--text-muted); border-radius: 8px; margin-right: 15px; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
-        .custom-checkbox svg { width: 16px; height: 16px; fill: none; stroke: white; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(0.5); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        
-        .step-content { flex-grow: 1; pointer-events: none; }
-        .step-title { font-size: 1.05rem; font-weight: 600; transition: all 0.3s; }
-        .step-desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; transition: all 0.3s; }
-        
-        /* Completed State Animations */
-        .step.done { opacity: 0.6; transform: translateX(4px); }
-        .step.done .custom-checkbox { background: var(--primary); border-color: var(--primary); }
-        .step.done .custom-checkbox svg { opacity: 1; transform: scale(1); }
-        .step.done .step-title { text-decoration: line-through; color: var(--text-muted); }
-        
-        /* Success Message */
-        #success-message { text-align: center; padding: 20px; font-weight: bold; color: var(--success); font-size: 1.2rem; animation: popIn 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        @keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }
-
-        /* History Log Styling */
-        .log-day { background: var(--glass-bg); padding: 15px; border-radius: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--glass-border); }
-        .log-date { font-weight: bold; font-size: 1.1rem; }
-        .log-stats { text-align: right; font-size: 0.9rem; color: var(--text-muted); }
-        .perfect { color: var(--success); font-weight: bold; }
-        .skipped { color: var(--missed); font-weight: bold; }
-
-        /* Buttons, Inputs & Overlays */
-        button { background: var(--primary); color: #fff; border: none; padding: 14px 20px; border-radius: 12px; font-weight: 700; font-size: 16px; width: 100%; cursor: pointer; transition: transform 0.1s; }
-        button:active { transform: scale(0.98); }
-        .btn-timer { background: var(--accent); padding: 8px 12px; font-size: 0.9rem; border-radius: 8px; margin-top: 10px; width: auto; pointer-events: auto; }
-        
-        input, textarea { width: 100%; padding: 12px; margin-top: 6px; margin-bottom: 16px; background: rgba(0,0,0,0.1); border: 1px solid var(--glass-border); color: var(--text-main); border-radius: 10px; box-sizing: border-box; }
-        
-        /* Glass Nav */
-        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; padding: 15px; border-top: 1px solid var(--glass-border); z-index: 50; padding-bottom: max(15px, env(safe-area-inset-bottom)); }
-        .nav div { flex: 1; text-align: center; color: var(--text-muted); font-weight: 600; cursor: pointer; transition: color 0.2s; }
-        .nav .active { color: var(--primary); }
-        .hidden { display: none !important; }
-        
-        #phase-badge { background: rgba(129, 140, 248, 0.2); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 0.8em; font-weight: bold; display: inline-block; margin-bottom: 12px; border: 1px solid var(--glass-border); }
-        
-        #active-timer-bar { position: fixed; top: 0; left: 0; right: 0; background: var(--glass-bg); backdrop-filter: blur(15px); border-bottom: 1px solid var(--glass-border); color: var(--text-main); padding: max(15px, env(safe-area-inset-top)) 15px 15px 15px; text-align: center; font-weight: bold; font-size: 1.5rem; z-index: 100; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        #btn-stop-timer { background: rgba(255,255,255,0.2); width: auto; padding: 8px 16px; margin: 0; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Protocol Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0d1b2a" id="meta-theme-color" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      min-height: 100%;
+      transition: background 0.8s ease, color 0.4s ease;
+      padding-bottom: 90px;
+    }
+    body.theme-am {
+      --bg-gradient: linear-gradient(160deg, #fef9f0 0%, #fde8c8 30%, #faf0f8 100%);
+      --header-gradient: linear-gradient(135deg, #ff9a5c 0%, #ffcd67 50%, #ffa8c8 100%);
+      --card-bg: rgba(255, 255, 255, 0.55);
+      --card-border: rgba(255, 180, 100, 0.25);
+      --card-done-bg: rgba(255, 220, 180, 0.35);
+      --text-primary: #2d1b00;
+      --text-secondary: #7a5c3a;
+      --text-done: #b8925a;
+      --accent: #f97316;
+      --accent-glow: rgba(249, 115, 22, 0.4);
+      --ring-stroke: #f97316;
+      --ring-bg: rgba(249,115,22,0.15);
+      --success-gradient: linear-gradient(135deg, #ffa726, #ff7043);
+      --nav-bg: rgba(255,255,255,0.7);
+      --nav-border: rgba(249,115,22,0.2);
+      --nav-active: #f97316;
+      --badge-bg: rgba(249,115,22,0.15);
+      --badge-color: #c2410c;
+      --timer-bg: rgba(249,115,22,0.12);
+      --timer-border: rgba(249,115,22,0.3);
+      --shadow: 0 8px 32px rgba(249,115,22,0.12);
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+    }
+    body.theme-pm {
+      --bg-gradient: linear-gradient(160deg, #0d1b2a 0%, #1a1035 40%, #0f1923 100%);
+      --header-gradient: linear-gradient(135deg, #312e81 0%, #4c1d95 50%, #1e3a5f 100%);
+      --card-bg: rgba(255, 255, 255, 0.06);
+      --card-border: rgba(167, 139, 250, 0.2);
+      --card-done-bg: rgba(167, 139, 250, 0.08);
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-done: #64748b;
+      --accent: #a78bfa;
+      --accent-glow: rgba(167, 139, 250, 0.45);
+      --ring-stroke: #a78bfa;
+      --ring-bg: rgba(167,139,250,0.1);
+      --success-gradient: linear-gradient(135deg, #7c3aed, #4f46e5);
+      --nav-bg: rgba(13, 27, 42, 0.85);
+      --nav-border: rgba(167,139,250,0.2);
+      --nav-active: #a78bfa;
+      --badge-bg: rgba(167,139,250,0.15);
+      --badge-color: #c4b5fd;
+      --timer-bg: rgba(167,139,250,0.1);
+      --timer-border: rgba(167,139,250,0.3);
+      --shadow: 0 8px 32px rgba(0,0,0,0.4);
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+    }
+    .app-header {
+      background: var(--header-gradient);
+      padding: 56px 20px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .app-header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+    }
+    .app-header h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.85);
+      position: relative;
+    }
+    #greeting-text {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: #fff;
+      margin-top: 4px;
+      position: relative;
+    }
+    .progress-ring-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 20px 8px;
+    }
+    .ring-container {
+      position: relative;
+      width: 130px;
+      height: 130px;
+    }
+    .ring-container svg {
+      transform: rotate(-90deg);
+      filter: drop-shadow(0 0 10px var(--accent-glow));
+      transition: filter 0.4s ease;
+    }
+    .ring-container svg.ring-complete {
+      animation: ring-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes ring-pulse {
+      0%, 100% { filter: drop-shadow(0 0 10px var(--accent-glow)) drop-shadow(0 0 20px var(--accent-glow)); }
+      50%       { filter: drop-shadow(0 0 25px var(--accent-glow)) drop-shadow(0 0 50px var(--accent-glow)); }
+    }
+    #progress-circle-bg { fill: none; stroke: var(--ring-bg); stroke-width: 8; }
+    #progress-circle {
+      fill: none;
+      stroke: var(--ring-stroke);
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ring-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    #progress-text { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+    #progress-label { font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); margin-top: 2px; }
+    .routine-meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
+    .phase-badge {
+      background: var(--badge-bg); color: var(--badge-color);
+      border: 1px solid var(--card-border); border-radius: 20px;
+      padding: 4px 12px; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.05em; backdrop-filter: blur(8px);
+    }
+    #time-context { color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; }
+    .tab-content { padding: 0 16px; }
+    .hidden { display: none !important; }
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 14px 16px; margin-bottom: 10px;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.3s ease, opacity 0.3s ease;
+      -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    .step-card:active { transform: scale(0.97); }
+    .step-card.done { background: var(--card-done-bg); opacity: 0.65; }
+    .step-card.animating { transform: scale(0.96); }
+    .step-check {
+      width: 26px; height: 26px; border-radius: 50%;
+      border: 2px solid var(--accent);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .step-card.done .step-check {
+      background: var(--accent); border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    .step-check svg { opacity: 0; transition: opacity 0.2s ease; }
+    .step-card.done .step-check svg { opacity: 1; }
+    .step-body { flex: 1; min-width: 0; }
+    .step-name { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); transition: color 0.3s ease; position: relative; }
+    .step-card.done .step-name { color: var(--text-done); }
+    .step-card.done .step-name::after {
+      content: ''; position: absolute; left: 0; top: 50%;
+      width: 100%; height: 1.5px; background: var(--text-done);
+      transform: scaleX(0);
+      animation: strikethrough 0.3s ease forwards;
+    }
+    @keyframes strikethrough {
+      from { transform: scaleX(0); transform-origin: left; }
+      to   { transform: scaleX(1); transform-origin: left; }
+    }
+    .step-desc { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+    .timer-btn {
+      background: var(--timer-bg); border: 1px solid var(--timer-border);
+      color: var(--accent); border-radius: 10px; padding: 5px 10px;
+      font-size: 0.78rem; font-weight: 700; cursor: pointer; flex-shrink: 0;
+      backdrop-filter: blur(8px); transition: background 0.2s, transform 0.1s;
+    }
+    .timer-btn:active { transform: scale(0.95); }
+    #timer-display {
+      text-align: center; padding: 12px;
+      font-size: 1.3rem; font-weight: 800;
+      color: var(--accent); letter-spacing: 0.05em;
+    }
+    #success-message { text-align: center; padding: 40px 20px; }
+    .success-inner {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 24px; padding: 40px 24px;
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.1);
+      animation: success-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes success-pop {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .success-emoji { font-size: 4rem; margin-bottom: 12px; }
+    .success-title { font-size: 1.7rem; font-weight: 800; color: var(--text-primary); }
+    .success-sub { font-size: 0.9rem; color: var(--text-secondary); margin-top: 8px; }
+    .success-btn {
+      margin-top: 20px; padding: 12px 28px; border-radius: 50px; border: none;
+      background: var(--success-gradient); color: #fff;
+      font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .success-btn:active { transform: scale(0.96); }
+    .history-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 16px; margin-bottom: 10px;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+    .history-date { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; color: var(--text-primary); }
+    .history-row { display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 4px; }
+    .history-bar-wrap { background: var(--ring-bg); border-radius: 6px; height: 6px; margin-top: 4px; overflow: hidden; }
+    .history-bar { height: 100%; border-radius: 6px; background: var(--accent); transition: width 0.5s ease; }
+    #view-history h2, #view-settings h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; margin-top: 20px; }
+    .settings-card {
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 20px; margin-bottom: 14px;
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+    }
+    .settings-card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 14px; }
+    .settings-card label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; margin-top: 12px; }
+    .settings-card input, .settings-card textarea {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--card-border);
+      background: rgba(255,255,255,0.06); color: var(--text-primary);
+      font-size: 0.85rem; font-family: "SF Mono", "Fira Code", monospace;
+      resize: vertical; transition: border-color 0.2s;
+    }
+    .settings-card input:focus, .settings-card textarea:focus { outline: none; border-color: var(--accent); }
+    .settings-btn {
+      width: 100%; margin-top: 14px; padding: 13px; border-radius: 12px; border: none;
+      background: var(--success-gradient); color: #fff;
+      font-size: 0.95rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 20px var(--accent-glow); transition: transform 0.15s;
+    }
+    .settings-btn:active { transform: scale(0.98); }
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--nav-bg); border-top: 1px solid var(--nav-border);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      display: flex; padding: 8px 0;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      z-index: 100;
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+      background: none; border: none; cursor: pointer; padding: 6px 0;
+      color: var(--text-secondary); font-size: 0.65rem; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent; transition: color 0.2s ease;
+    }
+    .nav-btn .nav-icon { font-size: 1.35rem; line-height: 1; transition: transform 0.2s ease; }
+    .nav-btn.active { color: var(--nav-active); }
+    .nav-btn.active .nav-icon { transform: scale(1.15); }
+  </style>
 </head>
 <body class="theme-pm">
+  <header class="app-header">
+    <h1>Protocol Tracker</h1>
+    <div id="greeting-text">Good Evening, Dan 🌙</div>
+  </header>
 
-    <div id="active-timer-bar" class="hidden">
-        <span id="timer-display">20:00</span>
-        <button id="btn-stop-timer">Stop</button>
-    </div>
-
-    <div id="view-routine">
-        <div id="phase-badge">Loading Phase...</div>
-        
-        <div class="header-container">
-            <div class="greeting-area">
-                <h2 id="greeting-text">Good Evening</h2>
-                <p style="color: var(--text-muted); margin:0;" id="time-context">Checking schedule...</p>
-            </div>
-            
-            <div class="progress-container">
-                <svg class="progress-ring" width="70" height="70">
-                    <circle class="progress-ring__circle-bg" cx="35" cy="35" r="30"></circle>
-                    <circle class="progress-ring__circle" id="progress-circle" cx="35" cy="35" r="30"></circle>
-                </svg>
-                <div class="progress-text" id="progress-text">0%</div>
-            </div>
+  <div id="view-routine" class="tab-content">
+    <div class="progress-ring-wrap">
+      <div class="ring-container">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle id="progress-circle-bg" cx="65" cy="65" r="55"/>
+          <circle id="progress-circle"    cx="65" cy="65" r="55"/>
+        </svg>
+        <div class="ring-center">
+          <span id="progress-text">0%</span>
+          <span id="progress-label">Done</span>
         </div>
-        
-        <div class="card" id="routine-container">
-            </div>
-        <div id="success-message" class="card hidden">
-            ✨ Protocol Complete. Great job.
-        </div>
+      </div>
+      <div class="routine-meta">
+        <span class="phase-badge" id="phase-badge">Phase 1</span>
+        <span id="time-context">Loading…</span>
+      </div>
     </div>
-
-    <div id="view-history" class="hidden">
-        <h2>Logbook</h2>
-        <p style="color: var(--text-muted); margin-top:-10px; margin-bottom: 20px;">Past 7 Days Adherence</p>
-        <div id="history-container"></div>
+    <div id="timer-display" class="hidden"></div>
+    <div id="routine-container"></div>
+    <div id="success-message" class="hidden">
+      <div class="success-inner">
+        <div class="success-emoji">✨</div>
+        <div class="success-title">Protocol Complete</div>
+        <div class="success-sub">Every step done. Your skin thanks you.</div>
+        <button class="success-btn" onclick="resetToday()">Start Fresh</button>
+      </div>
     </div>
+  </div>
 
-    <div id="view-settings" class="hidden">
-        <h2>Settings</h2>
-        <div class="card">
-            <label>Start Date</label>
-            <input type="date" id="set-start-date">
-            <label>Days per Phase</label>
-            <input type="number" id="set-phase-days">
-            <button id="btn-save-settings">Save Basic Settings</button>
-        </div>
+  <div id="view-history" class="tab-content hidden">
+    <h2>History</h2>
+    <div id="history-container"></div>
+  </div>
 
-        <div class="card">
-            <h3>Edit Protocol (JSON)</h3>
-            <textarea id="set-protocol-json"></textarea>
-            <button id="btn-save-protocol" style="background: transparent; border: 1px solid var(--accent); color: var(--accent);">Save Protocol Data</button>
-        </div>
+  <div id="view-settings" class="tab-content hidden">
+    <h2>Settings</h2>
+    <div class="settings-card">
+      <h3>Phase Tracking</h3>
+      <label>Protocol Start Date</label>
+      <input type="date" id="set-start-date" />
+      <label>Days Per Phase</label>
+      <input type="number" id="set-phase-days" min="1" max="90" />
     </div>
-
-    <div class="nav">
-        <div id="nav-routine" class="active" onclick="switchTab('routine')">Routine</div>
-        <div id="nav-history" onclick="switchTab('history')">History</div>
-        <div id="nav-settings" onclick="switchTab('settings')">Settings</div>
+    <div class="settings-card">
+      <h3>Custom Protocol (JSON)</h3>
+      <textarea id="set-protocol-json" rows="12"></textarea>
+      <button class="settings-btn" onclick="saveSettings()">Save Settings</button>
     </div>
+  </div>
 
-    <script src="protocol.js"></script>
-    <script src="app.js"></script>
-    <script>
-        // ULTIMATE CACHE KILL SWITCH
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for(let registration of registrations) {
-                    registration.unregister();
-                    console.log("Service Worker Assassinated");
-                }
-            });
-            // Force reload once to clear memory
-            if (!sessionStorage.getItem('reloaded')) {
-                sessionStorage.setItem('reloaded', 'true');
-                window.location.reload(true);
-            }
-        }
-    </script>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-routine" onclick="switchTab('routine')">
+      <span class="nav-icon">🌿</span>Routine
+    </button>
+    <button class="nav-btn" id="nav-history" onclick="switchTab('history')">
+      <span class="nav-icon">📋</span>History
+    </button>
+    <button class="nav-btn" id="nav-settings" onclick="switchTab('settings')">
+      <span class="nav-icon">⚙️</span>Settings
+    </button>
+  </nav>
+
+  <script src="protocol.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+  </script>
 </body>
 </html>
