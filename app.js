@@ -51,12 +51,14 @@ let focusPlanner = readJsonStorage('focusPlanner', [
 ]).map(normalizeFocusItem);
 
 let timerInterval = null;
+let nextTaskInterval = null;
 const timerSound  = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
 // Editor state
 let editorPhase   = String(Object.keys(protocolData).sort((a,b)=>Number(a)-Number(b))[0] || '1');
 let editorRoutine = 'AM';
 let focusSaveTimer = null;
+let editorFocusArea = 'skincare';
 
 // Init settings inputs
 document.getElementById('set-start-date').value  = settings.startDate;
@@ -88,6 +90,22 @@ function switchTab(tab) {
     syncEditorToCurrentRoutine(false);
     renderProtocolEditor();
   }
+}
+
+function selectEditorFocus(area) {
+  if (editorFocusArea === area) return;
+  if (editorFocusArea === 'skincare') {
+    clearTimeout(autoSaveTimer);
+    clearTimeout(phaseNameTimeout);
+    flushPhaseName();
+    persistProtocol();
+  } else {
+    clearTimeout(focusSaveTimer);
+    saveFocusState();
+  }
+
+  editorFocusArea = area;
+  renderProtocolEditor();
 }
 
 function applyTheme(isPM) {
@@ -209,6 +227,16 @@ function formatClock(timeStr) {
   return `${displayHour}:${String(minutes).padStart(2, '0')} ${suffix}`;
 }
 
+function formatCountdown(ms) {
+  if (ms <= 0) return '00:00';
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 function generateTodayFocusBlocks(dayOfWeek) {
   const todaysItems = focusPlanner
     .filter(item => item.days.includes(dayOfWeek) && item.name.trim())
@@ -274,6 +302,231 @@ function renderFocusTimeline(dayOfWeek) {
   `).join('');
 }
 
+function getSkincareAnchorMinutes(isPM) {
+  return isPM ? 20 * 60 + 30 : 7 * 60 + 30;
+}
+
+function getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay) {
+  const morningSteps = getRoutineSteps(phaseNum, phaseData, false, dayOfWeek);
+  const eveningSteps = getRoutineSteps(phaseNum, phaseData, true, dayOfWeek);
+  const amDone = historyDay?.steps?.AM || [];
+  const pmDone = historyDay?.steps?.PM || [];
+
+  function mapSteps(steps, isPM, completed) {
+    let cursor = getSkincareAnchorMinutes(isPM);
+    return steps.map((step, index) => {
+      const isObj = typeof step === 'object';
+      const timer = isObj && step.timer ? step.timer : 0;
+      const duration = Math.max(4, timer ? Math.ceil(timer / 60) : 6);
+      const item = {
+        id: `skincare-${isPM ? 'PM' : 'AM'}-${index}`,
+        kind: 'skincare',
+        category: 'skin care',
+        routineKey: isPM ? 'PM' : 'AM',
+        isPM,
+        index,
+        totalSteps: steps.length,
+        name: isObj ? step.name : step,
+        desc: isObj ? (step.desc || '') : '',
+        timer,
+        duration,
+        scheduledStart: toTimeString(cursor),
+        scheduledEnd: toTimeString(cursor + duration),
+        done: completed.includes(index)
+      };
+      cursor += duration;
+      return item;
+    });
+  }
+
+  return [
+    ...mapSteps(morningSteps, false, amDone),
+    ...mapSteps(eveningSteps, true, pmDone)
+  ];
+}
+
+function getFocusAgendaItems(dayOfWeek, historyDay) {
+  const done = historyDay?.focusDone || [];
+  return generateTodayFocusBlocks(dayOfWeek).map(block => ({
+    id: block.id,
+    kind: 'focus',
+    category: block.category,
+    name: block.name,
+    desc: block.desc || '',
+    duration: block.duration,
+    timer: 0,
+    scheduledStart: block.scheduledStart,
+    scheduledEnd: block.scheduledEnd,
+    pushed: block.pushed,
+    done: done.includes(block.id)
+  }));
+}
+
+function buildTodayAgenda(phaseNum, phaseData, dayOfWeek) {
+  const today = getTodayKey();
+  const historyDay = historyLog[today] || {};
+  return [
+    ...getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay),
+    ...getFocusAgendaItems(dayOfWeek, historyDay)
+  ].sort((a, b) => toMinutes(a.scheduledStart) - toMinutes(b.scheduledStart));
+}
+
+function startNextTaskCountdown(agenda) {
+  const countdownEl = document.getElementById('next-task-countdown');
+  const noteEl = document.getElementById('next-task-note');
+  const panelTimeEl = document.getElementById('next-panel-time');
+  if (nextTaskInterval) clearInterval(nextTaskInterval);
+
+  function renderCountdown() {
+    const now = new Date();
+    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+    const nextItem = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes);
+
+    if (!nextItem) {
+      countdownEl.innerText = '00:00';
+      noteEl.innerText = 'Nothing else scheduled today';
+      if (panelTimeEl) panelTimeEl.innerText = 'Done';
+      return;
+    }
+
+    const target = new Date();
+    const startMinutes = toMinutes(nextItem.scheduledStart);
+    target.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+    const countdown = formatCountdown(target - now);
+    countdownEl.innerText = countdown;
+    noteEl.innerText = `${formatClock(nextItem.scheduledStart)} · ${nextItem.name}`;
+    if (panelTimeEl) panelTimeEl.innerText = countdown;
+  }
+
+  renderCountdown();
+  nextTaskInterval = setInterval(renderCountdown, 1000);
+}
+
+function getAgendaPresentation(agenda, isPM) {
+  const now = new Date();
+  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  const nextItem = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes) || agenda.find(item => !item.done) || null;
+  const liveItem = agenda.find(item => {
+    const start = toMinutes(item.scheduledStart);
+    const end = toMinutes(item.scheduledEnd);
+    return !item.done && start <= nowMinutes && nowMinutes < end;
+  }) || nextItem || agenda[0] || null;
+
+  return { nextItem, liveItem, nowMinutes, isPM };
+}
+
+function renderHeroPanels(agenda, isPM) {
+  const { nextItem, liveItem } = getAgendaPresentation(agenda, isPM);
+  const nextTitle = document.getElementById('next-panel-title');
+  const nextSubtitle = document.getElementById('next-panel-subtitle');
+  const nextTime = document.getElementById('next-panel-time');
+  const liveTime = document.getElementById('live-focus-time');
+  const liveName = document.getElementById('live-focus-name');
+  const liveDesc = document.getElementById('live-focus-desc');
+  const liveStatus = document.getElementById('live-focus-status');
+  const liveThumb = document.getElementById('live-focus-thumb');
+  const agendaSubtitle = document.getElementById('agenda-subtitle');
+  const insight = document.getElementById('insight-body');
+
+  if (nextItem) {
+    nextTitle.innerText = `Next: ${nextItem.name}`;
+    nextSubtitle.innerText = nextItem.kind === 'skincare'
+      ? `${nextItem.isPM ? 'Evening' : 'Morning'} ritual`
+      : `${nextItem.category} session`;
+    nextTime.innerText = formatClock(nextItem.scheduledStart).replace(' AM', '').replace(' PM', '');
+  } else {
+    nextTitle.innerText = 'Next: Nothing scheduled';
+    nextSubtitle.innerText = 'You are clear for the rest of today';
+    nextTime.innerText = 'Done';
+  }
+
+  if (liveItem) {
+    liveTime.innerText = `${formatClock(liveItem.scheduledStart)} — ${liveItem.name}`;
+    liveName.innerText = liveItem.kind === 'skincare'
+      ? (liveItem.isPM ? 'Evening Ritual' : 'Morning Ritual')
+      : liveItem.name;
+    liveDesc.innerText = liveItem.kind === 'skincare'
+      ? `${liveItem.category} • ${liveItem.duration} min`
+      : `${liveItem.category} • ${liveItem.duration} min`;
+    liveStatus.innerText = liveItem.done ? 'Done' : (toMinutes(liveItem.scheduledStart) <= ((new Date().getHours() * 60) + new Date().getMinutes()) ? 'Active' : 'Queued');
+    liveThumb.innerText = liveItem.kind === 'skincare' ? '☾' : (liveItem.category === 'exercise' ? '✦' : liveItem.category === 'mindfulness' ? '☁' : '◌');
+  } else {
+    liveTime.innerText = isPM ? 'Tonight is clear' : 'This morning is clear';
+    liveName.innerText = 'No active focus';
+    liveDesc.innerText = 'Add routines or focus blocks in Settings.';
+    liveStatus.innerText = 'Idle';
+    liveThumb.innerText = '✦';
+  }
+
+  const skincareItems = agenda.filter(item => item.kind === 'skincare' && !item.done);
+  if (skincareItems.length) {
+    const headlineItem = skincareItems[0];
+    agendaSubtitle.innerText = `${formatClock(headlineItem.scheduledStart)} — ${headlineItem.isPM ? 'Evening Ritual' : 'Morning Ritual'}`;
+  } else {
+    agendaSubtitle.innerText = 'Tasks and routines arranged by time for this date.';
+  }
+
+  insight.innerText = isPM
+    ? 'Consistent evening routines create a calmer landing zone for the rest of the night. Stay steady and keep the sequence light.'
+    : 'A clear first block makes the rest of the day easier to trust. Start with the next visible action and let momentum do the rest.';
+}
+
+function renderAgenda(agenda) {
+  const container = document.getElementById('routine-container');
+  container.innerHTML = '';
+  document.getElementById('agenda-count').innerText = `${agenda.length} item${agenda.length === 1 ? '' : 's'}`;
+
+  if (!agenda.length) {
+    container.innerHTML = '<div class="focus-empty">No tasks are scheduled for today yet.</div>';
+    startNextTaskCountdown([]);
+    return;
+  }
+
+  const now = new Date();
+  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  const nextId = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes)?.id;
+
+  agenda.forEach(item => {
+    const card = document.createElement('div');
+    card.className = `agenda-card${item.done ? ' done' : ''}${item.id === nextId ? ' is-next' : ''}`;
+    const action = document.createElement('button');
+    action.className = 'agenda-action';
+    action.title = 'Mark complete';
+    action.textContent = item.done ? '✓' : '○';
+    action.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (item.kind === 'skincare') toggleStep(item.index, item.totalSteps, item.isPM);
+      else toggleFocusBlock(item.id);
+    });
+
+    const timerTag = item.timer
+      ? `<button class="agenda-tag" onclick="startTimer(event,${item.timer})">⏱ ${fmtTime(item.timer)}</button>`
+      : '';
+
+    card.innerHTML = `
+      <div>
+        <div class="agenda-time">${formatClock(item.scheduledStart)}</div>
+        <span class="agenda-time-note">${item.duration} min block</span>
+      </div>
+      <div>
+        <div class="agenda-name">${escHtml(item.name)}</div>
+        ${item.desc ? `<div class="agenda-desc">${escHtml(item.desc)}</div>` : ''}
+        <div class="agenda-tags">
+          <span class="agenda-tag">${escHtml(item.category)}</span>
+          <span class="agenda-tag">${formatClock(item.scheduledStart)} - ${formatClock(item.scheduledEnd)}</span>
+          ${item.kind === 'skincare' ? `<span class="agenda-tag">${item.isPM ? 'PM routine' : 'AM routine'}</span>` : ''}
+          ${item.pushed ? '<span class="agenda-tag">smart-pushed</span>' : ''}
+          ${timerTag}
+        </div>
+      </div>
+    `;
+    card.appendChild(action);
+    container.appendChild(card);
+  });
+
+  startNextTaskCountdown(agenda);
+}
+
 // ══════════════════════════════════════════
 //  ROUTINE
 // ══════════════════════════════════════════
@@ -307,7 +560,7 @@ function toggleStep(index, totalSteps, isPM) {
 function resetToday() {
   const today = getTodayKey();
   if (historyLog[today]) {
-    historyLog[today] = { AM:{done:0,total:0}, PM:{done:0,total:0}, steps:{AM:[],PM:[]} };
+    historyLog[today] = { AM:{done:0,total:0}, PM:{done:0,total:0}, steps:{AM:[],PM:[]}, focusDone:[] };
     localStorage.setItem('skincareHistory', JSON.stringify(historyLog));
   }
   renderRoutine();
@@ -322,13 +575,16 @@ function renderRoutine() {
   document.getElementById('time-context').innerText  = `${dayOfWeek} · ${isPM ? 'PM Routine' : 'AM Routine'}`;
 
   const routineSteps = getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek);
+  const agenda = buildTodayAgenda(phaseNum, phaseData, dayOfWeek);
 
   const today      = getTodayKey();
   const tod        = isPM ? 'PM' : 'AM';
   const completed  = historyLog[today]?.steps?.[tod] || [];
   const total      = routineSteps.length;
   const percent    = total === 0 ? 0 : Math.round((completed.length / total) * 100);
+  const allAgendaDone = agenda.length > 0 && agenda.every(item => item.done);
   updateRoutineHeader(isPM, dayOfWeek, total, completed.length, percent);
+  renderHeroPanels(agenda, isPM);
 
   const circle       = document.getElementById('progress-circle');
   const radius       = circle.r.baseVal.value;
@@ -341,55 +597,17 @@ function renderRoutine() {
   const container = document.getElementById('routine-container');
   const successMsg = document.getElementById('success-message');
 
-  if (percent === 100 && total > 0) {
+  if (percent === 100 && total > 0 && allAgendaDone) {
     container.classList.add('hidden');
     successMsg.classList.remove('hidden');
+    renderAgenda(agenda);
     if ('vibrate' in navigator) navigator.vibrate([100,50,100]);
     return;
   }
 
   container.classList.remove('hidden');
   successMsg.classList.add('hidden');
-  container.innerHTML = '';
-  renderFocusTimeline(dayOfWeek);
-
-  const stepEntries = routineSteps.map((step, i) => ({
-    step,
-    index: i,
-    isDone: completed.includes(i)
-  })).sort((a, b) => Number(a.isDone) - Number(b.isDone) || a.index - b.index);
-
-  stepEntries.forEach(({ step, index, isDone }, displayIndex) => {
-    const isObj  = typeof step === 'object';
-    const name   = isObj ? step.name : step;
-    const desc   = isObj && step.desc   ? step.desc   : null;
-    const timer  = isObj && step.timer  ? step.timer  : null;
-
-    const card = document.createElement('div');
-    card.className = `step-card entering${isDone ? ' done' : ''}`;
-    card.style.animationDelay = `${displayIndex * 45}ms`;
-    card.onclick = () => {
-      card.classList.add('animating');
-      setTimeout(() => card.classList.remove('animating'), 180);
-      toggleStep(index, total, isPM);
-    };
-    card.innerHTML = `
-      <div class="step-check">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="step-body">
-        <div class="step-name">${escHtml(name)}</div>
-        ${desc ? `<div class="step-desc">${escHtml(desc)}</div>` : ''}
-      </div>
-      ${timer ? `<button class="timer-btn" onclick="startTimer(event,${timer})">⏱ ${fmtTime(timer)}</button>` : ''}
-    `;
-    container.appendChild(card);
-    requestAnimationFrame(() => {
-      card.classList.remove('entering');
-    });
-  });
+  renderAgenda(agenda);
 }
 
 // ══════════════════════════════════════════
@@ -464,6 +682,10 @@ const FOCUS_CATEGORIES = [
   { key: 'engagement', label: 'Engagement' }
 ];
 
+function getActiveFocusCategory() {
+  return editorFocusArea === 'skincare' ? 'exercise' : editorFocusArea;
+}
+
 function getRoutineLabel(routineKey) {
   return ROUTINE_TYPES.find(r => r.key === routineKey)?.label || routineKey;
 }
@@ -479,6 +701,11 @@ function renderProtocolEditor() {
   const liveContext = getCurrentRoutineContext();
   const liveLabel = `${liveContext.phaseData?.name || `Phase ${liveContext.phaseNum}`} · ${getRoutineLabel(liveContext.routineKey)} · ${liveContext.dayOfWeek}`;
   document.getElementById('editor-live-context').innerText = liveLabel;
+  document.getElementById('editor-panel-skincare').classList.toggle('hidden', editorFocusArea !== 'skincare');
+  document.getElementById('editor-panel-focus').classList.toggle('hidden', editorFocusArea === 'skincare');
+  Array.from(document.querySelectorAll('#editor-focus-switcher .focus-switcher-btn')).forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.area === editorFocusArea);
+  });
   renderPhasePicker();
   renderRoutineTypePicker();
   renderStepList();
@@ -488,6 +715,17 @@ function renderProtocolEditor() {
   document.getElementById('phase-name-input').value = phaseName;
   // Sync JSON export
   document.getElementById('set-protocol-json').value = JSON.stringify(protocolData, null, 2);
+  const activeCategory = getActiveFocusCategory();
+  document.getElementById('focus-editor-context').innerText = `${FOCUS_CATEGORIES.find(category => category.key === activeCategory)?.label || activeCategory} blocks`;
+  document.getElementById('set-focus-json').value = JSON.stringify(
+    focusPlanner.filter(item => item.category === activeCategory),
+    null,
+    2
+  );
+  document.getElementById('set-all-json').value = JSON.stringify({
+    skincare: protocolData,
+    focusPlanner
+  }, null, 2);
 }
 
 function renderPhasePicker() {
@@ -504,13 +742,13 @@ function renderRoutineTypePicker() {
 }
 
 function selectEditorPhase(key) {
-  saveEditorState();
+  if (editorFocusArea === 'skincare') saveEditorState();
   editorPhase = key;
   renderProtocolEditor();
 }
 
 function selectEditorRoutine(key) {
-  saveEditorState();
+  if (editorFocusArea === 'skincare') saveEditorState();
   editorRoutine = key;
   renderRoutineTypePicker();
   renderStepList();
@@ -573,17 +811,17 @@ function renderStepList() {
     card.innerHTML = `
       <div class="editor-step-main">
         <span class="editor-drag">⠿</span>
-        <input class="editor-name-input" type="text" value="${escHtml(name)}" placeholder="Product or step name" oninput="scheduleAutoSave()"/>
+        <input class="editor-name-input" type="text" value="${escHtml(name)}" placeholder="Product or step name" oninput="updateEditorStepField(${i}, 'name', this.value)"/>
         <button class="editor-expand-btn${hasExtras?' has-extras':''}" onclick="toggleExtras(this)" title="Description &amp; Timer">${hasExtras?'✏️':'＋'}</button>
         <button class="editor-delete-btn" onclick="deleteEditorStep(${i})" title="Remove step">✕</button>
       </div>
       <div class="editor-step-extras${hasExtras?'':' hidden'}">
-        <textarea class="editor-desc-input" placeholder="Instructions (e.g. Apply to damp skin, rinse after 5 min)" oninput="scheduleAutoSave()">${escHtml(desc)}</textarea>
+        <textarea class="editor-desc-input" placeholder="Instructions (e.g. Apply to damp skin, rinse after 5 min)" oninput="updateEditorStepField(${i}, 'desc', this.value)">${escHtml(desc)}</textarea>
         <div class="editor-timer-row">
           <span class="editor-timer-label">⏱ Timer</span>
-          <input class="editor-timer-input" type="number" min="0" max="120" value="${timerMin||''}" placeholder="0" oninput="scheduleAutoSave()"/>
+          <input class="editor-timer-input" type="number" min="0" max="120" value="${timerMin||''}" placeholder="0" oninput="updateEditorStepTimer(${i}, this.value, null)"/>
           <span class="editor-timer-sep">min</span>
-          <input class="editor-timer-input" type="number" min="0" max="59" value="${timerSec||''}" placeholder="0" oninput="scheduleAutoSave()"/>
+          <input class="editor-timer-input" type="number" min="0" max="59" value="${timerSec||''}" placeholder="0" oninput="updateEditorStepTimer(${i}, null, this.value)"/>
           <span class="editor-timer-sep">sec</span>
           <button class="editor-timer-clear" onclick="clearTimer(this)">clear</button>
         </div>
@@ -591,6 +829,36 @@ function renderStepList() {
     `;
     container.appendChild(card);
   });
+}
+
+function ensureEditorStep(index) {
+  if (!protocolData[editorPhase]) protocolData[editorPhase] = {};
+  if (!Array.isArray(protocolData[editorPhase][editorRoutine])) protocolData[editorPhase][editorRoutine] = [];
+  if (!protocolData[editorPhase][editorRoutine][index]) protocolData[editorPhase][editorRoutine][index] = { name: '' };
+  return protocolData[editorPhase][editorRoutine][index];
+}
+
+function updateEditorStepField(index, field, value) {
+  const step = ensureEditorStep(index);
+  if (field === 'name') step.name = value.trimStart();
+  if (field === 'desc') {
+    const trimmed = value.trim();
+    if (trimmed) step.desc = trimmed;
+    else delete step.desc;
+  }
+  persistProtocol();
+}
+
+function updateEditorStepTimer(index, minutesValue, secondsValue) {
+  const step = ensureEditorStep(index);
+  const cards = document.querySelectorAll('#step-editor-list .editor-step-card');
+  const timerInputs = cards[index]?.querySelectorAll('.editor-timer-input') || [];
+  const minutes = parseInt(minutesValue ?? timerInputs[0]?.value, 10) || 0;
+  const seconds = parseInt(secondsValue ?? timerInputs[1]?.value, 10) || 0;
+  const total = (minutes * 60) + seconds;
+  if (total > 0) step.timer = total;
+  else delete step.timer;
+  persistProtocol();
 }
 
 function toggleExtras(btn) {
@@ -603,7 +871,13 @@ function toggleExtras(btn) {
 function clearTimer(btn) {
   const row = btn.closest('.editor-timer-row');
   row.querySelectorAll('.editor-timer-input').forEach(i => i.value = '');
-  scheduleAutoSave();
+  const card = btn.closest('.editor-step-card');
+  if (card) {
+    const index = Array.from(document.querySelectorAll('#step-editor-list .editor-step-card')).indexOf(card);
+    if (index >= 0) updateEditorStepTimer(index, 0, 0);
+  } else {
+    scheduleAutoSave();
+  }
 }
 
 // ── Modifiers ──
@@ -702,13 +976,15 @@ function scheduleFocusSave() {
 function renderFocusEditor() {
   const container = document.getElementById('focus-editor-list');
   container.innerHTML = '';
+  const activeCategory = getActiveFocusCategory();
+  const filteredPlanner = focusPlanner.filter(item => item.category === activeCategory);
 
-  if (!focusPlanner.length) {
-    container.innerHTML = '<div class="editor-empty">No focus blocks yet — add one for exercise, mindfulness, or repeating commitments.</div>';
+  if (!filteredPlanner.length) {
+    container.innerHTML = '<div class="editor-empty">No focus blocks yet for this activity focus.</div>';
     return;
   }
 
-  focusPlanner.forEach((item, index) => {
+  filteredPlanner.forEach((item, index) => {
     const normalized = normalizeFocusItem(item);
     const dayButtons = DAYS.map(day => `
       <button class="focus-day-pill${normalized.days.includes(day) ? ' active' : ''}" onclick="toggleFocusDay(this)" data-day="${day}" type="button">${day.slice(0, 3)}</button>
@@ -746,14 +1022,17 @@ function toggleFocusDay(button) {
 }
 
 function saveFocusState() {
+  const activeCategory = getActiveFocusCategory();
   const cards = document.querySelectorAll('#focus-editor-list .focus-editor-card');
-  focusPlanner = Array.from(cards).map(card => {
+  const preserved = focusPlanner.filter(item => item.category !== activeCategory);
+  const edited = Array.from(cards).map(card => {
     const index = Number(card.getAttribute('data-focus-index'));
-    const original = focusPlanner[index] || {};
+    const originals = focusPlanner.filter(item => item.category === activeCategory);
+    const original = originals[index] || {};
     const days = Array.from(card.querySelectorAll('.focus-day-pill.active')).map(dayButton => dayButton.dataset.day);
     return normalizeFocusItem({
       id: original.id,
-      category: card.querySelector('.focus-category-input')?.value,
+      category: activeCategory,
       name: card.querySelector('.focus-name-input')?.value.trim(),
       desc: card.querySelector('.focus-desc-input')?.value.trim(),
       time: card.querySelector('.focus-time-input')?.value || '07:00',
@@ -763,14 +1042,18 @@ function saveFocusState() {
     });
   }).filter(item => item.name);
 
+  focusPlanner = [...preserved, ...edited];
+
   persistFocusPlanner();
+  document.getElementById('set-focus-json').value = JSON.stringify(edited, null, 2);
+  document.getElementById('set-all-json').value = JSON.stringify({ skincare: protocolData, focusPlanner }, null, 2);
   showSavedIndicator();
 }
 
 function addFocusItem() {
   saveFocusState();
   focusPlanner.push(normalizeFocusItem({
-    category: 'exercise',
+    category: getActiveFocusCategory(),
     name: '',
     desc: '',
     time: '07:00',
@@ -783,30 +1066,29 @@ function addFocusItem() {
 }
 
 function deleteFocusItem(index) {
-  focusPlanner.splice(index, 1);
+  const activeCategory = getActiveFocusCategory();
+  const originals = focusPlanner.filter(item => item.category === activeCategory);
+  const targetId = originals[index]?.id;
+  focusPlanner = focusPlanner.filter(item => item.id !== targetId);
   persistFocusPlanner();
   renderFocusEditor();
   showSavedIndicator();
 }
 
 function saveStepState() {
-  const cards = document.querySelectorAll('#step-editor-list .editor-step-card');
-  const steps = [];
-  cards.forEach(card => {
-    const name = card.querySelector('.editor-name-input')?.value.trim();
-    if (!name) return;
-    const desc       = card.querySelector('.editor-desc-input')?.value.trim() || '';
-    const timerInputs = card.querySelectorAll('.editor-timer-input');
-    const timerMin   = parseInt(timerInputs[0]?.value) || 0;
-    const timerSec   = parseInt(timerInputs[1]?.value) || 0;
-    const totalTimer = timerMin * 60 + timerSec;
-    const obj = { name };
-    if (desc) obj.desc = desc;
-    if (totalTimer > 0) obj.timer = totalTimer;
-    steps.push(obj);
-  });
   if (!protocolData[editorPhase]) protocolData[editorPhase] = {};
-  protocolData[editorPhase][editorRoutine] = steps;
+  const current = Array.isArray(protocolData[editorPhase][editorRoutine]) ? protocolData[editorPhase][editorRoutine] : [];
+  protocolData[editorPhase][editorRoutine] = current
+    .map(step => {
+      if (!step || typeof step !== 'object') return null;
+      const nextStep = { ...step };
+      nextStep.name = (nextStep.name || '').trim();
+      if (!nextStep.name) return null;
+      if (!nextStep.desc) delete nextStep.desc;
+      if (!nextStep.timer) delete nextStep.timer;
+      return nextStep;
+    })
+    .filter(Boolean);
 }
 
 function saveModifierState() {
@@ -832,6 +1114,8 @@ function persistProtocol() {
   // Keep JSON export in sync
   const ta = document.getElementById('set-protocol-json');
   if (ta) ta.value = JSON.stringify(protocolData, null, 2);
+  const all = document.getElementById('set-all-json');
+  if (all) all.value = JSON.stringify({ skincare: protocolData, focusPlanner }, null, 2);
 }
 
 // ── Saved indicator ──
@@ -870,6 +1154,32 @@ function importFromJSON() {
   } catch(e) {
     alert('Invalid JSON. Please check the formatting and try again.');
   }
+}
+
+function importFocusJSON() {
+  try {
+    const activeCategory = getActiveFocusCategory();
+    const parsed = JSON.parse(document.getElementById('set-focus-json').value);
+    if (!Array.isArray(parsed)) throw new Error('Expected an array');
+    const preserved = focusPlanner.filter(item => item.category !== activeCategory);
+    focusPlanner = [
+      ...preserved,
+      ...parsed.map(item => normalizeFocusItem({ ...item, category: activeCategory }))
+    ];
+    persistFocusPlanner();
+    renderFocusEditor();
+    document.getElementById('set-all-json').value = JSON.stringify({ skincare: protocolData, focusPlanner }, null, 2);
+    showSavedIndicator();
+  } catch (e) {
+    alert('Invalid activity JSON. Please provide an array of focus blocks.');
+  }
+}
+
+function applySkincareEditorChanges() {
+  flushPhaseName();
+  persistProtocol();
+  renderRoutine();
+  showSavedIndicator();
 }
 
 // ══════════════════════════════════════════
