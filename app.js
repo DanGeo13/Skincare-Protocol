@@ -10,14 +10,7 @@ function readJsonStorage(key, fallback) {
 }
 
 const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-
-let protocolData = readJsonStorage('customProtocol', DEFAULT_PROTOCOL);
-let historyLog   = readJsonStorage('skincareHistory', {});
-let settings = {
-  startDate: localStorage.getItem('startDate') || new Date().toISOString().split('T')[0],
-  phaseDays: parseInt(localStorage.getItem('phaseDays'), 10) || 14
-};
-let focusPlanner = readJsonStorage('focusPlanner', [
+const DEFAULT_FOCUS_PLANNER = [
   {
     id: 'focus-exercise-default',
     category: 'exercise',
@@ -47,12 +40,64 @@ let focusPlanner = readJsonStorage('focusPlanner', [
     duration: 30,
     days: ['Tuesday', 'Thursday'],
     flexible: false
+  },
+  {
+    id: 'horizontal-movements',
+    category: 'exercise',
+    name: 'Horizontal Movements',
+    desc: 'Horizontal Pushing (Planche variations) & Horizontal Pulling (Front Lever Row variations).',
+    time: '20:30',
+    duration: 45,
+    days: ['Sunday'],
+    flexible: true
+  },
+  {
+    id: 'lower-body-movements',
+    category: 'exercise',
+    name: 'Lower Body Movements',
+    desc: 'Knee/Hip Extension (Single Leg Squats) & Knee Flexion (Nordic Curls).',
+    time: '20:30',
+    duration: 45,
+    days: ['Tuesday'],
+    flexible: true
+  },
+  {
+    id: 'recovery-flexibility',
+    category: 'exercise',
+    name: 'Recovery or Flexibility',
+    desc: '5-minute flexibility routine: Pike, Pancake, Front Split, Side Split, and Pigeon.',
+    time: '18:00',
+    duration: 45,
+    days: ['Wednesday'],
+    flexible: true
+  },
+  {
+    id: 'vertical-movements',
+    category: 'exercise',
+    name: 'Vertical Movements',
+    desc: 'Vertical Pushing (Handstand Push-up variations) & Vertical Pulling (One-Arm Chin-up variations).',
+    time: '18:00',
+    duration: 45,
+    days: ['Thursday', 'Friday'],
+    flexible: true
   }
-]).map(normalizeFocusItem);
+];
+
+let protocolData = readJsonStorage('customProtocol', DEFAULT_PROTOCOL);
+let historyLog   = readJsonStorage('skincareHistory', {});
+let settings = {
+  startDate: localStorage.getItem('startDate') || new Date().toISOString().split('T')[0],
+  phaseDays: parseInt(localStorage.getItem('phaseDays'), 10) || 14
+};
+let focusPlanner = mergeSeedFocusPlanner(
+  readJsonStorage('focusPlanner', DEFAULT_FOCUS_PLANNER),
+  DEFAULT_FOCUS_PLANNER
+).map(normalizeFocusItem);
 
 let timerInterval = null;
 let nextTaskInterval = null;
 const timerSound  = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+let selectedRoutineOffset = 0;
 
 // Editor state
 let editorPhase   = String(Object.keys(protocolData).sort((a,b)=>Number(a)-Number(b))[0] || '1');
@@ -113,7 +158,7 @@ function applyTheme(isPM) {
   document.body.classList.toggle('theme-am', !isPM);
   const themeColor = document.querySelector('meta[name="theme-color"]');
   if (themeColor) {
-    themeColor.setAttribute('content', isPM ? '#1a1035' : '#fde8c8');
+    themeColor.setAttribute('content', isPM ? '#17324b' : '#ece7de');
   }
 }
 
@@ -145,11 +190,31 @@ function getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek) {
   return routineSteps;
 }
 
-function getCurrentRoutineContext() {
-  const now = new Date();
-  const isPM = now.getHours() >= 12;
+function getDateForOffset(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date;
+}
+
+function getRelativeDayLabel(offsetDays = 0) {
+  if (offsetDays === 0) return 'Today';
+  if (offsetDays === 1) return 'Tomorrow';
+  return getDateForOffset(offsetDays).toLocaleDateString('en-AU', { weekday: 'long' });
+}
+
+function formatDateHeading(date) {
+  return date.toLocaleDateString('en-AU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  });
+}
+
+function getCurrentRoutineContext(offsetDays = selectedRoutineOffset) {
+  const now = getDateForOffset(offsetDays);
+  const isPM = offsetDays === 0 ? new Date().getHours() >= 12 : false;
   const dayOfWeek = now.toLocaleDateString('en-AU', { weekday: 'long' });
-  const phaseNum = calculatePhase();
+  const phaseNum = calculatePhase(now);
   const phaseKey = String(phaseNum);
   const phaseData = protocolData[phaseKey] || protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
   let routineKey = 'AM';
@@ -167,22 +232,9 @@ function getCurrentRoutineContext() {
 }
 
 function updateRoutineHeader(isPM, dayOfWeek, total, doneCount, percent) {
-  const chipRoutine = document.getElementById('header-chip-routine');
-  const chipFocus = document.getElementById('header-chip-focus');
-  const subtext = document.getElementById('greeting-subtext');
   const remaining = Math.max(total - doneCount, 0);
 
   document.getElementById('greeting-text').innerText = isPM ? 'Good Evening, Dan 🌙' : 'Good Morning, Dan ☀️';
-  chipRoutine.textContent = isPM ? 'Evening ritual' : 'Morning ritual';
-  chipFocus.textContent = remaining === 0
-    ? 'Locked in'
-    : isPM ? 'Wind-down mode' : 'Fresh-start mode';
-  subtext.textContent = remaining === 0
-    ? 'Everything for this session is done. Hold the streak and enjoy the glow.'
-    : isPM
-      ? `Your ${dayOfWeek.toLowerCase()} reset is ready. ${remaining} step${remaining === 1 ? '' : 's'} left before lights-out mode.`
-      : `Start clean and stack momentum early. ${remaining} step${remaining === 1 ? '' : 's'} left to close out the morning.`;
-
   document.getElementById('summary-remaining').innerText = String(remaining);
   document.getElementById('summary-remaining-note').innerText = remaining === 1 ? 'step to go' : 'steps to go';
   document.getElementById('summary-completion').innerText = `${doneCount} / ${total}`;
@@ -200,6 +252,15 @@ function normalizeFocusItem(item = {}) {
     days: Array.isArray(item.days) && item.days.length ? item.days : DAY_NAMES.slice(0, 5),
     flexible: item.flexible !== false
   };
+}
+
+function mergeSeedFocusPlanner(existingItems = [], seedItems = []) {
+  const merged = Array.isArray(existingItems) ? existingItems.slice() : [];
+  const existingIds = new Set(merged.map(item => item?.id).filter(Boolean));
+  seedItems.forEach(item => {
+    if (!existingIds.has(item.id)) merged.push(item);
+  });
+  return merged;
 }
 
 function persistFocusPlanner() {
@@ -386,16 +447,16 @@ function getFocusAgendaItems(dayOfWeek, historyDay) {
   }));
 }
 
-function buildTodayAgenda(phaseNum, phaseData, dayOfWeek) {
-  const today = getTodayKey();
-  const historyDay = historyLog[today] || {};
+function buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, offsetDays = 0) {
+  const dateKey = getDateKey(offsetDays);
+  const historyDay = historyLog[dateKey] || {};
   return [
     ...getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay),
     ...getFocusAgendaItems(dayOfWeek, historyDay)
   ].sort((a, b) => toMinutes(a.scheduledStart) - toMinutes(b.scheduledStart));
 }
 
-function startNextTaskCountdown(agenda) {
+function startNextTaskCountdown(agenda, offsetDays = 0) {
   const countdownEl = document.getElementById('next-task-countdown');
   const countdownNumberEl = countdownEl?.querySelector('.next-task-number');
   const countdownUnitEl = countdownEl?.querySelector('.next-task-unit');
@@ -404,6 +465,16 @@ function startNextTaskCountdown(agenda) {
   if (nextTaskInterval) clearInterval(nextTaskInterval);
 
   function renderCountdown() {
+    if (offsetDays !== 0) {
+      if (countdownNumberEl) countdownNumberEl.innerText = '--';
+      if (countdownUnitEl) countdownUnitEl.innerText = '';
+      noteEl.innerText = `Viewing ${getRelativeDayLabel(offsetDays).toLowerCase()}`;
+      if (panelTimeEl) panelTimeEl.innerText = agenda[0]
+        ? formatClock(agenda[0].scheduledStart).replace(' AM', '').replace(' PM', '')
+        : '--';
+      return;
+    }
+
     const now = new Date();
     const nowMinutes = (now.getHours() * 60) + now.getMinutes();
     const nextItem = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes);
@@ -432,22 +503,20 @@ function startNextTaskCountdown(agenda) {
 }
 
 function getDateKey(offsetDays = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
+  const date = getDateForOffset(offsetDays);
   return date.toISOString().split('T')[0];
 }
 
 function getWeekdayForOffset(offsetDays = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
+  const date = getDateForOffset(offsetDays);
   return date.toLocaleDateString('en-AU', { weekday: 'long' });
 }
 
 function buildUpcomingPreview(daysAhead = 3) {
   const previews = [];
-  for (let offset = 1; offset <= daysAhead; offset++) {
+  for (let offset = 0; offset <= daysAhead; offset++) {
     const dayOfWeek = getWeekdayForOffset(offset);
-    const phaseNum = calculatePhase();
+    const phaseNum = calculatePhase(getDateForOffset(offset));
     const phaseData = protocolData[String(phaseNum)] || protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
     const focusBlocks = generateTodayFocusBlocks(dayOfWeek);
     const morningSteps = getRoutineSteps(phaseNum, phaseData, false, dayOfWeek);
@@ -457,7 +526,9 @@ function buildUpcomingPreview(daysAhead = 3) {
     const firstEvening = eveningSteps[0];
 
     previews.push({
-      label: offset === 1 ? 'Tomorrow' : dayOfWeek,
+      offset,
+      label: getRelativeDayLabel(offset),
+      dateLabel: formatDateHeading(getDateForOffset(offset)),
       title: firstFocus?.name || firstMorning?.name || firstEvening?.name || 'No events yet',
       meta: firstFocus
         ? `${formatClock(firstFocus.scheduledStart)} · ${firstFocus.category}`
@@ -475,13 +546,14 @@ function buildUpcomingPreview(daysAhead = 3) {
 function renderUpcomingPreview() {
   const container = document.getElementById('upcoming-list');
   if (!container) return;
-  const previews = buildUpcomingPreview(3);
+  const previews = buildUpcomingPreview(4);
   container.innerHTML = previews.map(item => `
-    <div class="upcoming-card">
+    <button class="upcoming-card${item.offset === selectedRoutineOffset ? ' active' : ''}" type="button" onclick="setRoutineDayOffset(${item.offset})">
       <div class="upcoming-day">${escHtml(item.label)}</div>
+      <div class="upcoming-date">${escHtml(item.dateLabel)}</div>
       <div class="upcoming-title">${escHtml(item.title)}</div>
       <div class="upcoming-meta">${escHtml(item.meta)}${item.count ? ` · ${item.count} items` : ''}</div>
-    </div>
+    </button>
   `).join('');
 }
 
@@ -498,89 +570,60 @@ function getAgendaPresentation(agenda, isPM) {
   return { nextItem, liveItem, nowMinutes, isPM };
 }
 
-function renderHeroPanels(agenda, isPM) {
-  const { nextItem, liveItem } = getAgendaPresentation(agenda, isPM);
+function renderHeroPanels(agenda, dayLabel, offsetDays = 0) {
+  const { nextItem } = getAgendaPresentation(agenda, false);
   const nextTitle = document.getElementById('next-panel-title');
   const nextSubtitle = document.getElementById('next-panel-subtitle');
   const nextTime = document.getElementById('next-panel-time');
-  const liveTime = document.getElementById('live-focus-time');
-  const liveName = document.getElementById('live-focus-name');
-  const liveDesc = document.getElementById('live-focus-desc');
-  const liveStatus = document.getElementById('live-focus-status');
-  const liveThumb = document.getElementById('live-focus-thumb');
   const agendaSubtitle = document.getElementById('agenda-subtitle');
-  const insight = document.getElementById('insight-body');
 
   if (nextItem) {
-    nextTitle.innerText = `Next: ${nextItem.name}`;
+    nextTitle.innerText = nextItem.name;
     nextSubtitle.innerText = nextItem.kind === 'skincare'
-      ? `${nextItem.isPM ? 'Evening' : 'Morning'} ritual`
-      : `${nextItem.category} session`;
+      ? `${nextItem.isPM ? 'Evening' : 'Morning'} routine · ${formatClock(nextItem.scheduledStart)}`
+      : `${nextItem.category} · ${formatClock(nextItem.scheduledStart)}`;
     nextTime.innerText = formatClock(nextItem.scheduledStart).replace(' AM', '').replace(' PM', '');
   } else {
-    nextTitle.innerText = 'Next: Nothing scheduled';
-    nextSubtitle.innerText = 'You are clear for the rest of today';
-    nextTime.innerText = 'Done';
+    nextTitle.innerText = offsetDays === 0 ? 'Nothing else scheduled' : 'No events scheduled';
+    nextSubtitle.innerText = offsetDays === 0 ? 'You are clear for the rest of today' : `Nothing planned for ${dayLabel.toLowerCase()}`;
+    nextTime.innerText = '--';
   }
 
-  if (liveItem) {
-    liveTime.innerText = `${formatClock(liveItem.scheduledStart)} — ${liveItem.name}`;
-    liveName.innerText = liveItem.kind === 'skincare'
-      ? (liveItem.isPM ? 'Evening Ritual' : 'Morning Ritual')
-      : liveItem.name;
-    liveDesc.innerText = liveItem.kind === 'skincare'
-      ? `${liveItem.category} • ${liveItem.duration} min`
-      : `${liveItem.category} • ${liveItem.duration} min`;
-    liveStatus.innerText = liveItem.done ? 'Done' : (toMinutes(liveItem.scheduledStart) <= ((new Date().getHours() * 60) + new Date().getMinutes()) ? 'Active' : 'Queued');
-    liveThumb.innerText = liveItem.kind === 'skincare' ? '☾' : (liveItem.category === 'exercise' ? '✦' : liveItem.category === 'mindfulness' ? '☁' : '◌');
-  } else {
-    liveTime.innerText = isPM ? 'Tonight is clear' : 'This morning is clear';
-    liveName.innerText = 'No active focus';
-    liveDesc.innerText = 'Add routines or focus blocks in Settings.';
-    liveStatus.innerText = 'Idle';
-    liveThumb.innerText = '✦';
-  }
-
-  const skincareItems = agenda.filter(item => item.kind === 'skincare' && !item.done);
-  if (skincareItems.length) {
-    const headlineItem = skincareItems[0];
-    agendaSubtitle.innerText = `${formatClock(headlineItem.scheduledStart)} — ${headlineItem.isPM ? 'Evening Ritual' : 'Morning Ritual'}`;
-  } else {
-    agendaSubtitle.innerText = 'Tasks and routines arranged by time for this date.';
-  }
-
-  insight.innerText = isPM
-    ? 'Consistent evening routines create a calmer landing zone for the rest of the night. Stay steady and keep the sequence light.'
-    : 'A clear first block makes the rest of the day easier to trust. Start with the next visible action and let momentum do the rest.';
+  agendaSubtitle.innerText = offsetDays === 0
+    ? 'Everything remaining today, arranged by time.'
+    : `Everything planned for ${dayLabel.toLowerCase()}.`;
 }
 
-function renderAgenda(agenda) {
+function renderAgenda(agenda, offsetDays = 0) {
   const container = document.getElementById('routine-container');
   container.innerHTML = '';
   document.getElementById('agenda-count').innerText = `${agenda.length} item${agenda.length === 1 ? '' : 's'}`;
 
   if (!agenda.length) {
-    container.innerHTML = '<div class="focus-empty">No tasks are scheduled for today yet.</div>';
-    startNextTaskCountdown([]);
+    container.innerHTML = `<div class="focus-empty">No tasks are scheduled for ${offsetDays === 0 ? 'today' : getRelativeDayLabel(offsetDays).toLowerCase()} yet.</div>`;
+    startNextTaskCountdown([], offsetDays);
     return;
   }
 
   const now = new Date();
   const nowMinutes = (now.getHours() * 60) + now.getMinutes();
-  const nextId = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes)?.id;
+  const nextId = offsetDays === 0 ? agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes)?.id : agenda.find(item => !item.done)?.id;
 
   agenda.forEach(item => {
     const card = document.createElement('div');
     card.className = `agenda-card${item.done ? ' done' : ''}${item.id === nextId ? ' is-next' : ''}`;
     const action = document.createElement('button');
     action.className = 'agenda-action';
-    action.title = 'Mark complete';
-    action.textContent = item.done ? '✓' : '○';
-    action.addEventListener('click', (event) => {
-      event.stopPropagation();
-      if (item.kind === 'skincare') toggleStep(item.index, item.totalSteps, item.isPM);
-      else toggleFocusBlock(item.id);
-    });
+    action.title = offsetDays === 0 ? 'Mark complete' : 'Future items cannot be completed yet';
+    action.textContent = item.done ? '✓' : (offsetDays === 0 ? '○' : '·');
+    action.disabled = offsetDays !== 0;
+    if (offsetDays === 0) {
+      action.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (item.kind === 'skincare') toggleStep(item.index, item.totalSteps, item.isPM);
+        else toggleFocusBlock(item.id);
+      });
+    }
 
     const timerTag = item.timer
       ? `<button class="agenda-tag" onclick="startTimer(event,${item.timer})">⏱ ${fmtTime(item.timer)}</button>`
@@ -607,15 +650,15 @@ function renderAgenda(agenda) {
     container.appendChild(card);
   });
 
-  startNextTaskCountdown(agenda);
+  startNextTaskCountdown(agenda, offsetDays);
 }
 
 // ══════════════════════════════════════════
 //  ROUTINE
 // ══════════════════════════════════════════
-function calculatePhase() {
+function calculatePhase(forDate = new Date()) {
   const start = new Date(`${settings.startDate}T00:00:00`);
-  const today = new Date();
+  const today = new Date(forDate);
   today.setHours(0, 0, 0, 0);
   const diffMs = Math.max(0, today - start);
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -625,6 +668,11 @@ function calculatePhase() {
 }
 
 function getTodayKey() { return new Date().toISOString().split('T')[0]; }
+
+function setRoutineDayOffset(offsetDays = 0) {
+  selectedRoutineOffset = Math.max(0, Number(offsetDays) || 0);
+  renderRoutine();
+}
 
 function toggleStep(index, totalSteps, isPM) {
   if ('vibrate' in navigator) navigator.vibrate(50);
@@ -650,24 +698,22 @@ function resetToday() {
 }
 
 function renderRoutine() {
-  const { isPM, dayOfWeek, phaseNum, phaseData } = getCurrentRoutineContext();
+  const { isPM, dayOfWeek, phaseNum, phaseData, now } = getCurrentRoutineContext(selectedRoutineOffset);
 
-  applyTheme(isPM);
+  applyTheme(new Date().getHours() >= 12);
 
-  document.getElementById('phase-badge').innerText   = phaseData.name || `Phase ${phaseNum}`;
-  document.getElementById('time-context').innerText  = `${dayOfWeek} · ${isPM ? 'PM Routine' : 'AM Routine'}`;
+  const dayLabel = getRelativeDayLabel(selectedRoutineOffset);
+  document.getElementById('phase-badge').innerText   = dayLabel;
+  document.getElementById('time-context').innerText  = `${formatDateHeading(now)} · ${selectedRoutineOffset === 0 ? 'Showing the rest of today' : 'Previewing recurring items ahead'}`;
 
-  const routineSteps = getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek);
-  const agenda = buildTodayAgenda(phaseNum, phaseData, dayOfWeek);
+  const agenda = buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, selectedRoutineOffset);
 
-  const today      = getTodayKey();
-  const tod        = isPM ? 'PM' : 'AM';
-  const completed  = historyLog[today]?.steps?.[tod] || [];
-  const total      = routineSteps.length;
-  const percent    = total === 0 ? 0 : Math.round((completed.length / total) * 100);
+  const completedCount = agenda.filter(item => item.done).length;
+  const total      = agenda.length;
+  const percent    = total === 0 ? 0 : Math.round((completedCount / total) * 100);
   const allAgendaDone = agenda.length > 0 && agenda.every(item => item.done);
-  updateRoutineHeader(isPM, dayOfWeek, total, completed.length, percent);
-  renderHeroPanels(agenda, isPM);
+  updateRoutineHeader(new Date().getHours() >= 12, dayOfWeek, total, completedCount, percent);
+  renderHeroPanels(agenda, dayLabel, selectedRoutineOffset);
   renderUpcomingPreview();
 
   const circle       = document.getElementById('progress-circle');
@@ -681,17 +727,17 @@ function renderRoutine() {
   const container = document.getElementById('routine-container');
   const successMsg = document.getElementById('success-message');
 
-  if (percent === 100 && total > 0 && allAgendaDone) {
+  if (selectedRoutineOffset === 0 && percent === 100 && total > 0 && allAgendaDone) {
     container.classList.add('hidden');
     successMsg.classList.remove('hidden');
-    renderAgenda(agenda);
+    renderAgenda(agenda, selectedRoutineOffset);
     if ('vibrate' in navigator) navigator.vibrate([100,50,100]);
     return;
   }
 
   container.classList.remove('hidden');
   successMsg.classList.add('hidden');
-  renderAgenda(agenda);
+  renderAgenda(agenda, selectedRoutineOffset);
 }
 
 // ══════════════════════════════════════════
