@@ -10,6 +10,13 @@ function readJsonStorage(key, fallback) {
 }
 
 const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const GOOGLE_CALENDAR_CONFIG = {
+  apiKey: 'AIzaSyAnfnCskefKLmmNrQtJF8Cd1oe_e5rT7SQ',
+  clientId: '676961479977-77pl9hfpivqm3n5st41cu7p2hsq9ufro.apps.googleusercontent.com',
+  discoveryDoc: 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
+  scope: 'https://www.googleapis.com/auth/calendar.readonly'
+};
+const GOOGLE_CALENDAR_DAYS_AHEAD = 4;
 const DEFAULT_FOCUS_PLANNER = [
   {
     id: 'focus-exercise-default',
@@ -98,6 +105,18 @@ let timerInterval = null;
 let nextTaskInterval = null;
 const timerSound  = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 let selectedRoutineOffset = 0;
+let googleTokenClient = null;
+let googleCalendarState = {
+  gapiReady: false,
+  gisReady: false,
+  clientReady: false,
+  signedIn: false,
+  availableCalendars: [],
+  selectedCalendarIds: readJsonStorage('googleCalendarSelectedIds', []),
+  eventsByDate: {},
+  syncError: '',
+  isSyncing: false
+};
 
 // Editor state
 let editorPhase   = String(Object.keys(protocolData).sort((a,b)=>Number(a)-Number(b))[0] || '1');
@@ -134,6 +153,7 @@ function switchTab(tab) {
   if (tab === 'settings') {
     syncEditorToCurrentRoutine(false);
     renderProtocolEditor();
+    renderGoogleCalendarSettings();
   }
 }
 
@@ -265,6 +285,21 @@ function mergeSeedFocusPlanner(existingItems = [], seedItems = []) {
 
 function persistFocusPlanner() {
   localStorage.setItem('focusPlanner', JSON.stringify(focusPlanner));
+}
+
+function getAllExportData() {
+  return {
+    skincare: protocolData,
+    focusPlanner,
+    googleCalendar: {
+      selectedCalendarIds: googleCalendarState.selectedCalendarIds
+    }
+  };
+}
+
+function syncExportTextareas() {
+  const all = document.getElementById('set-all-json');
+  if (all) all.value = JSON.stringify(getAllExportData(), null, 2);
 }
 
 function toMinutes(timeStr) {
@@ -447,12 +482,18 @@ function getFocusAgendaItems(dayOfWeek, historyDay) {
   }));
 }
 
+function getCalendarAgendaItems(offsetDays = 0) {
+  const dateKey = getDateKey(offsetDays);
+  return Array.isArray(googleCalendarState.eventsByDate[dateKey]) ? googleCalendarState.eventsByDate[dateKey] : [];
+}
+
 function buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, offsetDays = 0) {
   const dateKey = getDateKey(offsetDays);
   const historyDay = historyLog[dateKey] || {};
   return [
     ...getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay),
-    ...getFocusAgendaItems(dayOfWeek, historyDay)
+    ...getFocusAgendaItems(dayOfWeek, historyDay),
+    ...getCalendarAgendaItems(offsetDays)
   ].sort((a, b) => toMinutes(a.scheduledStart) - toMinutes(b.scheduledStart));
 }
 
@@ -518,26 +559,18 @@ function buildUpcomingPreview(daysAhead = 3) {
     const dayOfWeek = getWeekdayForOffset(offset);
     const phaseNum = calculatePhase(getDateForOffset(offset));
     const phaseData = protocolData[String(phaseNum)] || protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
-    const focusBlocks = generateTodayFocusBlocks(dayOfWeek);
-    const morningSteps = getRoutineSteps(phaseNum, phaseData, false, dayOfWeek);
-    const eveningSteps = getRoutineSteps(phaseNum, phaseData, true, dayOfWeek);
-    const firstFocus = focusBlocks[0];
-    const firstMorning = morningSteps[0];
-    const firstEvening = eveningSteps[0];
+    const agenda = buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, offset);
+    const firstItem = agenda[0];
 
     previews.push({
       offset,
       label: getRelativeDayLabel(offset),
       dateLabel: formatDateHeading(getDateForOffset(offset)),
-      title: firstFocus?.name || firstMorning?.name || firstEvening?.name || 'No events yet',
-      meta: firstFocus
-        ? `${formatClock(firstFocus.scheduledStart)} · ${firstFocus.category}`
-        : firstMorning
-          ? 'Morning ritual scheduled'
-          : firstEvening
-            ? 'Evening ritual scheduled'
-            : 'Nothing planned yet',
-      count: focusBlocks.length + morningSteps.length + eveningSteps.length
+      title: firstItem?.name || 'No events yet',
+      meta: firstItem
+        ? `${firstItem.allDay ? 'All day' : formatClock(firstItem.scheduledStart)} · ${firstItem.category}`
+        : 'Nothing planned yet',
+      count: agenda.length
     });
   }
   return previews;
@@ -614,10 +647,11 @@ function renderAgenda(agenda, offsetDays = 0) {
     card.className = `agenda-card${item.done ? ' done' : ''}${item.id === nextId ? ' is-next' : ''}`;
     const action = document.createElement('button');
     action.className = 'agenda-action';
-    action.title = offsetDays === 0 ? 'Mark complete' : 'Future items cannot be completed yet';
-    action.textContent = item.done ? '✓' : (offsetDays === 0 ? '○' : '·');
-    action.disabled = offsetDays !== 0;
-    if (offsetDays === 0) {
+    const canToggle = offsetDays === 0 && item.kind !== 'calendar';
+    action.title = canToggle ? 'Mark complete' : (item.kind === 'calendar' ? 'Google Calendar items are read-only' : 'Future items cannot be completed yet');
+    action.textContent = item.done ? '✓' : (canToggle ? '○' : '·');
+    action.disabled = !canToggle;
+    if (canToggle) {
       action.addEventListener('click', (event) => {
         event.stopPropagation();
         if (item.kind === 'skincare') toggleStep(item.index, item.totalSteps, item.isPM);
@@ -639,8 +673,9 @@ function renderAgenda(agenda, offsetDays = 0) {
         ${item.desc ? `<div class="agenda-desc">${escHtml(item.desc)}</div>` : ''}
         <div class="agenda-tags">
           <span class="agenda-tag">${escHtml(item.category)}</span>
-          <span class="agenda-tag">${formatClock(item.scheduledStart)} - ${formatClock(item.scheduledEnd)}</span>
+          <span class="agenda-tag">${item.allDay ? 'All day' : `${formatClock(item.scheduledStart)} - ${formatClock(item.scheduledEnd)}`}</span>
           ${item.kind === 'skincare' ? `<span class="agenda-tag">${item.isPM ? 'PM routine' : 'AM routine'}</span>` : ''}
+          ${item.kind === 'calendar' && item.calendarName ? `<span class="agenda-tag">${escHtml(item.calendarName)}</span>` : ''}
           ${item.pushed ? '<span class="agenda-tag">smart-pushed</span>' : ''}
           ${timerTag}
         </div>
@@ -708,10 +743,11 @@ function renderRoutine() {
 
   const agenda = buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, selectedRoutineOffset);
 
-  const completedCount = agenda.filter(item => item.done).length;
-  const total      = agenda.length;
+  const completableItems = agenda.filter(item => item.kind !== 'calendar');
+  const completedCount = completableItems.filter(item => item.done).length;
+  const total      = completableItems.length;
   const percent    = total === 0 ? 0 : Math.round((completedCount / total) * 100);
-  const allAgendaDone = agenda.length > 0 && agenda.every(item => item.done);
+  const allAgendaDone = completableItems.length > 0 && completableItems.every(item => item.done);
   updateRoutineHeader(new Date().getHours() >= 12, dayOfWeek, total, completedCount, percent);
   renderHeroPanels(agenda, dayLabel, selectedRoutineOffset);
   renderUpcomingPreview();
@@ -852,10 +888,8 @@ function renderProtocolEditor() {
     null,
     2
   );
-  document.getElementById('set-all-json').value = JSON.stringify({
-    skincare: protocolData,
-    focusPlanner
-  }, null, 2);
+  syncExportTextareas();
+  renderGoogleCalendarSettings();
 }
 
 function renderPhasePicker() {
@@ -1176,7 +1210,7 @@ function saveFocusState() {
 
   persistFocusPlanner();
   document.getElementById('set-focus-json').value = JSON.stringify(edited, null, 2);
-  document.getElementById('set-all-json').value = JSON.stringify({ skincare: protocolData, focusPlanner }, null, 2);
+  syncExportTextareas();
   showSavedIndicator();
 }
 
@@ -1244,8 +1278,7 @@ function persistProtocol() {
   // Keep JSON export in sync
   const ta = document.getElementById('set-protocol-json');
   if (ta) ta.value = JSON.stringify(protocolData, null, 2);
-  const all = document.getElementById('set-all-json');
-  if (all) all.value = JSON.stringify({ skincare: protocolData, focusPlanner }, null, 2);
+  syncExportTextareas();
 }
 
 // ── Saved indicator ──
@@ -1298,7 +1331,7 @@ function importFocusJSON() {
     ];
     persistFocusPlanner();
     renderFocusEditor();
-    document.getElementById('set-all-json').value = JSON.stringify({ skincare: protocolData, focusPlanner }, null, 2);
+    syncExportTextareas();
     showSavedIndicator();
   } catch (e) {
     alert('Invalid activity JSON. Please provide an array of focus blocks.');
@@ -1319,5 +1352,334 @@ function escHtml(str) {
   return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function isGoogleCalendarConfigured() {
+  return Boolean(GOOGLE_CALENDAR_CONFIG.apiKey && GOOGLE_CALENDAR_CONFIG.clientId);
+}
+
+function isHttpOrigin() {
+  return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+}
+
+function getSelectedCalendarIds() {
+  if (googleCalendarState.selectedCalendarIds.length) return googleCalendarState.selectedCalendarIds;
+  return googleCalendarState.availableCalendars
+    .filter(calendar => calendar.selected !== false)
+    .map(calendar => calendar.id);
+}
+
+function persistSelectedGoogleCalendars(ids) {
+  googleCalendarState.selectedCalendarIds = ids;
+  localStorage.setItem('googleCalendarSelectedIds', JSON.stringify(ids));
+  syncExportTextareas();
+}
+
+function renderGoogleCalendarSettings() {
+  const statusEl = document.getElementById('google-calendar-status');
+  const listEl = document.getElementById('google-calendar-list');
+  const connectBtn = document.getElementById('google-calendar-connect-btn');
+  const refreshBtn = document.getElementById('google-calendar-refresh-btn');
+  const disconnectBtn = document.getElementById('google-calendar-disconnect-btn');
+  if (!statusEl || !listEl || !connectBtn || !refreshBtn || !disconnectBtn) return;
+
+  if (!isGoogleCalendarConfigured()) {
+    statusEl.innerText = 'Google Calendar is not configured yet.';
+    listEl.innerHTML = '';
+    connectBtn.disabled = true;
+    refreshBtn.disabled = true;
+    disconnectBtn.disabled = true;
+    return;
+  }
+
+  if (!isHttpOrigin()) {
+    statusEl.innerText = `Google Calendar requires an http/https origin. Current origin: ${window.location.origin || window.location.protocol}`;
+    listEl.innerHTML = '';
+    connectBtn.disabled = true;
+    refreshBtn.disabled = true;
+    disconnectBtn.disabled = true;
+    return;
+  }
+
+  if (googleCalendarState.syncError) {
+    statusEl.innerText = googleCalendarState.syncError;
+  } else if (googleCalendarState.isSyncing) {
+    statusEl.innerText = 'Syncing Google Calendar…';
+  } else if (!googleCalendarState.gapiReady || !googleCalendarState.gisReady || !googleCalendarState.clientReady) {
+    statusEl.innerText = 'Loading Google Calendar libraries…';
+  } else if (!googleCalendarState.signedIn) {
+    statusEl.innerText = `Ready to connect on ${window.location.origin}.`;
+  } else {
+    const eventCount = Object.values(googleCalendarState.eventsByDate).reduce((sum, items) => sum + items.length, 0);
+    statusEl.innerText = `Connected. ${eventCount} calendar item${eventCount === 1 ? '' : 's'} loaded across the next ${GOOGLE_CALENDAR_DAYS_AHEAD + 1} days.`;
+  }
+
+  connectBtn.disabled = !googleCalendarState.gapiReady || !googleCalendarState.gisReady || !googleCalendarState.clientReady || googleCalendarState.isSyncing || !isHttpOrigin();
+  connectBtn.innerText = googleCalendarState.signedIn ? 'Reconnect Google Calendar' : 'Connect Google Calendar';
+  refreshBtn.disabled = !googleCalendarState.signedIn || googleCalendarState.isSyncing;
+  disconnectBtn.disabled = !googleCalendarState.signedIn;
+
+  if (!googleCalendarState.signedIn) {
+    listEl.innerHTML = '<div class="focus-empty">Sign in to load your calendars and choose which ones should appear in the schedule.</div>';
+    return;
+  }
+
+  if (!googleCalendarState.availableCalendars.length) {
+    listEl.innerHTML = '<div class="focus-empty">No calendars available yet. Refresh after connecting.</div>';
+    return;
+  }
+
+  const selected = new Set(getSelectedCalendarIds());
+  listEl.innerHTML = googleCalendarState.availableCalendars.map(calendar => `
+    <label class="focus-flags" style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <span>${escHtml(calendar.summary || calendar.id)}</span>
+      <input
+        type="checkbox"
+        ${selected.has(calendar.id) ? 'checked' : ''}
+        onchange='toggleGoogleCalendarSelection(${JSON.stringify(calendar.id)}, this.checked)'
+      />
+    </label>
+  `).join('');
+}
+
+function onGoogleApiLoaded() {
+  if (!window.gapi) {
+    googleCalendarState.syncError = 'Google API client failed to load.';
+    renderGoogleCalendarSettings();
+    return;
+  }
+
+  gapi.load('client', async () => {
+    try {
+      await gapi.client.init({
+        apiKey: GOOGLE_CALENDAR_CONFIG.apiKey,
+        discoveryDocs: [GOOGLE_CALENDAR_CONFIG.discoveryDoc]
+      });
+      googleCalendarState.gapiReady = true;
+      googleCalendarState.clientReady = true;
+      googleCalendarState.syncError = '';
+      renderGoogleCalendarSettings();
+    } catch (error) {
+      googleCalendarState.syncError = `Google Calendar client init failed: ${error?.message || 'unknown error'}`;
+      renderGoogleCalendarSettings();
+    }
+  });
+}
+
+function onGoogleIdentityLoaded() {
+  if (!window.google?.accounts?.oauth2) {
+    googleCalendarState.syncError = 'Google Identity Services failed to load.';
+    renderGoogleCalendarSettings();
+    return;
+  }
+
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CALENDAR_CONFIG.clientId,
+    scope: GOOGLE_CALENDAR_CONFIG.scope,
+    callback: async (response) => {
+      if (response?.error) {
+        googleCalendarState.syncError = `Google sign-in failed: ${response.error}`;
+        googleCalendarState.signedIn = false;
+        renderGoogleCalendarSettings();
+        return;
+      }
+
+      googleCalendarState.signedIn = true;
+      googleCalendarState.syncError = '';
+      await refreshGoogleCalendarEvents();
+    }
+  });
+
+  googleCalendarState.gisReady = true;
+  renderGoogleCalendarSettings();
+}
+
+async function handleGoogleCalendarAuth() {
+  if (!googleTokenClient || !googleCalendarState.clientReady) return;
+  googleCalendarState.syncError = '';
+  renderGoogleCalendarSettings();
+  const existingToken = gapi.client.getToken();
+  googleTokenClient.requestAccessToken({ prompt: existingToken ? '' : 'consent' });
+}
+
+async function disconnectGoogleCalendar() {
+  const token = gapi.client.getToken();
+  if (token?.access_token && window.google?.accounts?.oauth2) {
+    google.accounts.oauth2.revoke(token.access_token, () => {});
+  }
+  gapi.client.setToken(null);
+  googleCalendarState.signedIn = false;
+  googleCalendarState.availableCalendars = [];
+  googleCalendarState.eventsByDate = {};
+  googleCalendarState.syncError = '';
+  renderGoogleCalendarSettings();
+  renderRoutine();
+}
+
+async function refreshGoogleCalendarEvents() {
+  if (!googleCalendarState.signedIn || !googleCalendarState.clientReady) return;
+  googleCalendarState.isSyncing = true;
+  googleCalendarState.syncError = '';
+  renderGoogleCalendarSettings();
+
+  try {
+    await loadAvailableGoogleCalendars();
+    await loadGoogleCalendarEvents();
+    renderRoutine();
+  } catch (error) {
+    googleCalendarState.syncError = `Google Calendar sync failed: ${error?.result?.error?.message || error?.message || 'unknown error'}`;
+  } finally {
+    googleCalendarState.isSyncing = false;
+    renderGoogleCalendarSettings();
+  }
+}
+
+async function loadAvailableGoogleCalendars() {
+  const response = await gapi.client.calendar.calendarList.list({ showHidden: false });
+  const items = response.result.items || [];
+  googleCalendarState.availableCalendars = items.map(item => ({
+    id: item.id,
+    summary: item.summary,
+    primary: Boolean(item.primary),
+    selected: true
+  }));
+
+  if (!googleCalendarState.selectedCalendarIds.length) {
+    persistSelectedGoogleCalendars(items.map(item => item.id));
+  }
+}
+
+function startOfDay(date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getDateKeyFromDate(date) {
+  return date.toISOString().split('T')[0];
+}
+
+function buildDateRangeKeys(startDate, endDateInclusive) {
+  const keys = [];
+  let cursor = startOfDay(startDate);
+  const limit = startOfDay(endDateInclusive);
+  while (cursor <= limit) {
+    keys.push(getDateKeyFromDate(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return keys;
+}
+
+function toLocalTimeString(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function mapGoogleEventToAgendaItems(event, calendarMeta, rangeStart, rangeEnd) {
+  const isAllDay = Boolean(event.start?.date && !event.start?.dateTime);
+  const start = event.start?.dateTime ? new Date(event.start.dateTime) : new Date(`${event.start?.date}T00:00:00`);
+  const endExclusive = event.end?.dateTime ? new Date(event.end.dateTime) : new Date(`${event.end?.date}T00:00:00`);
+  const summary = event.summary || 'Untitled calendar event';
+  const detailParts = [calendarMeta?.summary, event.location].filter(Boolean);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(endExclusive.getTime())) return [];
+
+  const boundedStart = start < rangeStart ? rangeStart : start;
+  const boundedEnd = endExclusive > rangeEnd ? rangeEnd : endExclusive;
+  if (boundedEnd <= boundedStart) return [];
+
+  if (!isAllDay) {
+    return [{
+      id: `calendar-${calendarMeta?.id || 'calendar'}-${event.id}`,
+      kind: 'calendar',
+      category: 'calendar',
+      calendarName: calendarMeta?.summary || 'Calendar',
+      name: summary,
+      desc: detailParts.join(' · '),
+      duration: Math.max(5, Math.round((endExclusive - start) / 60000)),
+      timer: 0,
+      scheduledStart: toLocalTimeString(start),
+      scheduledEnd: toLocalTimeString(new Date(Math.max(start.getTime() + 300000, endExclusive.getTime()))),
+      done: false,
+      allDay: false,
+      dateKey: getDateKeyFromDate(start)
+    }];
+  }
+
+  const spanEnd = addDays(endExclusive, -1);
+  return buildDateRangeKeys(start, spanEnd).map(dateKey => ({
+    id: `calendar-${calendarMeta?.id || 'calendar'}-${event.id}-${dateKey}`,
+    kind: 'calendar',
+    category: 'calendar',
+    calendarName: calendarMeta?.summary || 'Calendar',
+    name: summary,
+    desc: detailParts.join(' · '),
+    duration: 24 * 60,
+    timer: 0,
+    scheduledStart: '00:00',
+    scheduledEnd: '23:59',
+    done: false,
+    allDay: true,
+    dateKey
+  }));
+}
+
+async function loadGoogleCalendarEvents() {
+  const selectedIds = getSelectedCalendarIds();
+  const rangeStart = startOfDay(new Date());
+  const rangeEnd = addDays(rangeStart, GOOGLE_CALENDAR_DAYS_AHEAD + 1);
+  const eventsByDate = {};
+
+  buildDateRangeKeys(rangeStart, addDays(rangeEnd, -1)).forEach(dateKey => {
+    eventsByDate[dateKey] = [];
+  });
+
+  const requests = selectedIds.map(async (calendarId) => {
+    const response = await gapi.client.calendar.events.list({
+      calendarId,
+      timeMin: rangeStart.toISOString(),
+      timeMax: rangeEnd.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      showDeleted: false,
+      maxResults: 100
+    });
+    const calendarMeta = googleCalendarState.availableCalendars.find(calendar => calendar.id === calendarId);
+    (response.result.items || []).forEach(event => {
+      mapGoogleEventToAgendaItems(event, calendarMeta, rangeStart, rangeEnd).forEach(item => {
+        if (!eventsByDate[item.dateKey]) eventsByDate[item.dateKey] = [];
+        eventsByDate[item.dateKey].push(item);
+      });
+    });
+  });
+
+  await Promise.all(requests);
+
+  Object.keys(eventsByDate).forEach(dateKey => {
+    eventsByDate[dateKey].sort((a, b) => toMinutes(a.scheduledStart) - toMinutes(b.scheduledStart));
+  });
+
+  googleCalendarState.eventsByDate = eventsByDate;
+}
+
+function toggleGoogleCalendarSelection(calendarId, checked) {
+  const selected = new Set(getSelectedCalendarIds());
+  if (checked) selected.add(calendarId);
+  else selected.delete(calendarId);
+  persistSelectedGoogleCalendars(Array.from(selected));
+  refreshGoogleCalendarEvents();
+}
+
+window.onGoogleApiLoaded = onGoogleApiLoaded;
+window.onGoogleIdentityLoaded = onGoogleIdentityLoaded;
+window.handleGoogleCalendarAuth = handleGoogleCalendarAuth;
+window.refreshGoogleCalendarEvents = refreshGoogleCalendarEvents;
+window.disconnectGoogleCalendar = disconnectGoogleCalendar;
+window.toggleGoogleCalendarSelection = toggleGoogleCalendarSelection;
+
 // Init
+syncExportTextareas();
 renderRoutine();
