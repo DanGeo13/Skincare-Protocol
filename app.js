@@ -16,6 +16,10 @@ const GOOGLE_CALENDAR_CONFIG = {
   discoveryDoc: 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
   scope: 'https://www.googleapis.com/auth/calendar.readonly'
 };
+const REMOTE_SYNC_CONFIG = {
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbylolZpKZYR3577sIZbyh-axCdAhAFbo9xaXbtjg69bQcdZHHpHd0rjzuQ1CIhHgGuHlg/exec',
+  sheetId: '1tCXnyliyvnYZKhrfjwcgl6AgNwTFkf_mttmtqRjimkk'
+};
 const GOOGLE_CALENDAR_DAYS_AHEAD = 4;
 
 function formatLocalDateKey(date) {
@@ -139,6 +143,15 @@ let googleCalendarState = {
   loadedDaysAhead: GOOGLE_CALENDAR_DAYS_AHEAD,
   syncError: '',
   isSyncing: false
+};
+let remoteSyncTimer = null;
+let remoteSyncState = {
+  initialized: false,
+  syncing: false,
+  pending: false,
+  lastSyncedAt: '',
+  error: '',
+  source: 'local'
 };
 
 // Editor state
@@ -313,13 +326,16 @@ function mergeSeedFocusPlanner(existingItems = [], seedItems = []) {
 }
 
 function persistFocusPlanner() {
-  localStorage.setItem('focusPlanner', JSON.stringify(focusPlanner));
+  persistCachedState();
+  scheduleRemoteSync();
 }
 
 function getAllExportData() {
   return {
     skincare: protocolData,
     focusPlanner,
+    history: historyLog,
+    settings,
     googleCalendar: {
       selectedCalendarIds: googleCalendarState.selectedCalendarIds
     }
@@ -329,6 +345,165 @@ function getAllExportData() {
 function syncExportTextareas() {
   const all = document.getElementById('set-all-json');
   if (all) all.value = JSON.stringify(getAllExportData(), null, 2);
+}
+
+function persistCachedState() {
+  localStorage.setItem('customProtocol', JSON.stringify(protocolData));
+  localStorage.setItem('skincareHistory', JSON.stringify(historyLog));
+  localStorage.setItem('focusPlanner', JSON.stringify(focusPlanner));
+  localStorage.setItem('startDate', settings.startDate);
+  localStorage.setItem('phaseDays', settings.phaseDays);
+  localStorage.setItem('googleCalendarSelectedIds', JSON.stringify(googleCalendarState.selectedCalendarIds));
+}
+
+function buildRemoteStatePayload() {
+  return {
+    skincare: protocolData,
+    history: historyLog,
+    focusPlanner,
+    settings,
+    googleCalendar: {
+      selectedCalendarIds: googleCalendarState.selectedCalendarIds
+    }
+  };
+}
+
+function applyRemoteState(remoteData = {}) {
+  if (remoteData.skincare && typeof remoteData.skincare === 'object') {
+    protocolData = normalizeProtocolPhases(remoteData.skincare);
+  }
+  if (remoteData.history && typeof remoteData.history === 'object') {
+    historyLog = remoteData.history;
+  }
+  if (Array.isArray(remoteData.focusPlanner)) {
+    focusPlanner = mergeSeedFocusPlanner(remoteData.focusPlanner, DEFAULT_FOCUS_PLANNER).map(normalizeFocusItem);
+  }
+  if (remoteData.settings && typeof remoteData.settings === 'object') {
+    settings = {
+      startDate: remoteData.settings.startDate || settings.startDate,
+      phaseDays: parseInt(remoteData.settings.phaseDays, 10) || settings.phaseDays
+    };
+  }
+  if (remoteData.googleCalendar?.selectedCalendarIds) {
+    googleCalendarState.selectedCalendarIds = remoteData.googleCalendar.selectedCalendarIds;
+  }
+
+  persistCachedState();
+  syncExportTextareas();
+  const startDateEl = document.getElementById('set-start-date');
+  const phaseDaysEl = document.getElementById('set-phase-days');
+  if (startDateEl) startDateEl.value = settings.startDate;
+  if (phaseDaysEl) phaseDaysEl.value = settings.phaseDays;
+}
+
+function renderSyncStatus() {
+  const statusEl = document.getElementById('sync-status');
+  if (!statusEl) return;
+  if (!REMOTE_SYNC_CONFIG.webAppUrl) {
+    statusEl.innerText = 'Google Sheets sync is not configured.';
+    return;
+  }
+  if (remoteSyncState.syncing) {
+    statusEl.innerText = 'Syncing changes to Google Sheets…';
+    return;
+  }
+  if (remoteSyncState.error) {
+    statusEl.innerText = `Sync issue: ${remoteSyncState.error}`;
+    return;
+  }
+  if (remoteSyncState.lastSyncedAt) {
+    statusEl.innerText = `Synced via Google Sheets at ${new Date(remoteSyncState.lastSyncedAt).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}.`;
+    return;
+  }
+  statusEl.innerText = 'Using local cache until Google Sheets sync completes.';
+}
+
+async function fetchRemoteState() {
+  const response = await fetch(`${REMOTE_SYNC_CONFIG.webAppUrl}?action=getState`, {
+    method: 'GET'
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || 'Failed to load remote state');
+  return data.data || {};
+}
+
+async function pushRemoteState() {
+  const response = await fetch(REMOTE_SYNC_CONFIG.webAppUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'saveState',
+      data: buildRemoteStatePayload()
+    })
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || 'Failed to save remote state');
+  return data;
+}
+
+async function syncToRemote(force = false) {
+  if (!REMOTE_SYNC_CONFIG.webAppUrl) return;
+  if (remoteSyncState.syncing && !force) {
+    remoteSyncState.pending = true;
+    return;
+  }
+  remoteSyncState.syncing = true;
+  remoteSyncState.error = '';
+  renderSyncStatus();
+  try {
+    const result = await pushRemoteState();
+    remoteSyncState.lastSyncedAt = result.savedAt || new Date().toISOString();
+    remoteSyncState.initialized = true;
+    remoteSyncState.source = 'remote';
+  } catch (error) {
+    remoteSyncState.error = describeGoogleError(error);
+  } finally {
+    remoteSyncState.syncing = false;
+    renderSyncStatus();
+    if (remoteSyncState.pending) {
+      remoteSyncState.pending = false;
+      syncToRemote();
+    }
+  }
+}
+
+function scheduleRemoteSync() {
+  persistCachedState();
+  syncExportTextareas();
+  if (!remoteSyncState.initialized) return;
+  clearTimeout(remoteSyncTimer);
+  remoteSyncTimer = setTimeout(() => {
+    syncToRemote();
+  }, 500);
+}
+
+async function initRemoteSync() {
+  if (!REMOTE_SYNC_CONFIG.webAppUrl) {
+    renderSyncStatus();
+    return;
+  }
+  remoteSyncState.syncing = true;
+  renderSyncStatus();
+  try {
+    const remoteData = await fetchRemoteState();
+    applyRemoteState(remoteData);
+    remoteSyncState.initialized = true;
+    remoteSyncState.lastSyncedAt = new Date().toISOString();
+    remoteSyncState.source = 'remote';
+    remoteSyncState.error = '';
+    renderRoutine();
+    if (!document.getElementById('view-settings')?.classList.contains('hidden')) {
+      renderProtocolEditor();
+    }
+  } catch (error) {
+    remoteSyncState.initialized = true;
+    remoteSyncState.error = describeGoogleError(error);
+  } finally {
+    remoteSyncState.syncing = false;
+    renderSyncStatus();
+  }
 }
 
 function toMinutes(timeStr) {
@@ -415,7 +590,8 @@ function toggleFocusBlock(id) {
   const done = historyLog[today].focusDone;
   if (done.includes(id)) done.splice(done.indexOf(id), 1);
   else done.push(id);
-  localStorage.setItem('skincareHistory', JSON.stringify(historyLog));
+  persistCachedState();
+  scheduleRemoteSync();
   if ('vibrate' in navigator) navigator.vibrate(40);
   renderRoutine();
 }
@@ -817,7 +993,8 @@ function toggleStep(index, totalSteps, isPM) {
   else arr.push(index);
   historyLog[today][tod].done  = arr.length;
   historyLog[today][tod].total = totalSteps;
-  localStorage.setItem('skincareHistory', JSON.stringify(historyLog));
+  persistCachedState();
+  scheduleRemoteSync();
   renderRoutine();
 }
 
@@ -825,7 +1002,8 @@ function resetToday() {
   const today = getTodayKey();
   if (historyLog[today]) {
     historyLog[today] = { AM:{done:0,total:0}, PM:{done:0,total:0}, steps:{AM:[],PM:[]}, focusDone:[] };
-    localStorage.setItem('skincareHistory', JSON.stringify(historyLog));
+    persistCachedState();
+    scheduleRemoteSync();
   }
   renderRoutine();
 }
@@ -907,6 +1085,15 @@ function startTimer(e, seconds) {
       }, 15000);
     }
   }, 1000);
+}
+
+function describeGoogleError(error) {
+  return error?.result?.error?.message
+    || error?.result?.error?.details
+    || error?.details
+    || error?.message
+    || error?.error
+    || (typeof error === 'string' ? error : JSON.stringify(error));
 }
 
 function maybeRequestNotificationPermission() {
@@ -1074,6 +1261,7 @@ function renderProtocolEditor() {
   }
   syncExportTextareas();
   renderGoogleCalendarSettings();
+  renderSyncStatus();
 }
 
 function renderPhasePicker() {
@@ -1545,11 +1733,10 @@ function saveModifierState() {
 }
 
 function persistProtocol() {
-  localStorage.setItem('customProtocol', JSON.stringify(protocolData));
-  // Keep JSON export in sync
+  persistCachedState();
   const ta = document.getElementById('set-protocol-json');
   if (ta) ta.value = JSON.stringify(protocolData, null, 2);
-  syncExportTextareas();
+  scheduleRemoteSync();
 }
 
 // ── Saved indicator ──
@@ -1569,8 +1756,8 @@ function showSavedIndicator() {
 function savePhaseSettings() {
   settings.startDate = document.getElementById('set-start-date').value;
   settings.phaseDays = parseInt(document.getElementById('set-phase-days').value, 10) || 14;
-  localStorage.setItem('startDate', settings.startDate);
-  localStorage.setItem('phaseDays', settings.phaseDays);
+  persistCachedState();
+  scheduleRemoteSync();
   showSavedIndicator();
 }
 
@@ -1642,8 +1829,8 @@ function getSelectedCalendarIds() {
 
 function persistSelectedGoogleCalendars(ids) {
   googleCalendarState.selectedCalendarIds = ids;
-  localStorage.setItem('googleCalendarSelectedIds', JSON.stringify(ids));
-  syncExportTextareas();
+  persistCachedState();
+  scheduleRemoteSync();
 }
 
 function renderGoogleCalendarSettings() {
@@ -1731,7 +1918,7 @@ function onGoogleApiLoaded() {
       googleCalendarState.syncError = '';
       renderGoogleCalendarSettings();
     } catch (error) {
-      googleCalendarState.syncError = `Google Calendar client init failed: ${error?.message || 'unknown error'}`;
+      googleCalendarState.syncError = `Google Calendar init failed on ${window.location.origin}: ${describeGoogleError(error)}`;
       renderGoogleCalendarSettings();
     }
   });
@@ -1799,7 +1986,7 @@ async function refreshGoogleCalendarEvents() {
     await loadGoogleCalendarEvents();
     renderRoutine();
   } catch (error) {
-    googleCalendarState.syncError = `Google Calendar sync failed: ${error?.result?.error?.message || error?.message || 'unknown error'}`;
+    googleCalendarState.syncError = `Google Calendar sync failed: ${describeGoogleError(error)}`;
   } finally {
     googleCalendarState.isSyncing = false;
     renderGoogleCalendarSettings();
@@ -1966,4 +2153,6 @@ window.moveCurrentPhase = moveCurrentPhase;
 
 // Init
 syncExportTextareas();
+renderSyncStatus();
 renderRoutine();
+initRemoteSync();
