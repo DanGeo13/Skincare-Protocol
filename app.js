@@ -17,7 +17,7 @@ const GOOGLE_CALENDAR_CONFIG = {
   scope: 'https://www.googleapis.com/auth/calendar.readonly'
 };
 const REMOTE_SYNC_CONFIG = {
-  webAppUrl: 'https://script.google.com/macros/s/AKfycbylolZpKZYR3577sIZbyh-axCdAhAFbo9xaXbtjg69bQcdZHHpHd0rjzuQ1CIhHgGuHlg/exec',
+  webAppUrl: 'https://script.google.com/macros/s/AKfycbxNLG7fyZd_esxz0L51RPE8ahZdf19Y-MkNKn6Q-gJb2o42r-Hs-iPpX3pVVYHV8eppQA/exec',
   sheetId: '1tCXnyliyvnYZKhrfjwcgl6AgNwTFkf_mttmtqRjimkk'
 };
 const GOOGLE_CALENDAR_DAYS_AHEAD = 4;
@@ -435,28 +435,57 @@ function renderSyncStatus() {
 }
 
 async function fetchRemoteState() {
-  const response = await fetch(`${REMOTE_SYNC_CONFIG.webAppUrl}?action=getState`, {
-    method: 'GET'
+  const data = await callRemoteScript_({
+    action: 'getState'
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
   if (!data.ok) throw new Error(data.error || 'Failed to load remote state');
   return data.data || {};
 }
 
 async function pushRemoteState() {
-  const response = await fetch(REMOTE_SYNC_CONFIG.webAppUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'saveState',
-      data: buildRemoteStatePayload()
-    })
+  const data = await callRemoteScript_({
+    action: 'saveState',
+    payload: JSON.stringify(buildRemoteStatePayload())
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
   if (!data.ok) throw new Error(data.error || 'Failed to save remote state');
   return data;
+}
+
+function callRemoteScript_(params = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName = `__protocolSync_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const script = document.createElement('script');
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Apps Script request timed out'));
+    }, 15000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      if (script.parentNode) script.parentNode.removeChild(script);
+      delete window[callbackName];
+    }
+
+    window[callbackName] = (response) => {
+      cleanup();
+      resolve(response);
+    };
+
+    const url = new URL(REMOTE_SYNC_CONFIG.webAppUrl);
+    url.searchParams.set('callback', callbackName);
+    Object.keys(params).forEach(key => {
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.set(key, String(params[key]));
+      }
+    });
+
+    script.src = url.toString();
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Apps Script script load failed'));
+    };
+    document.body.appendChild(script);
+  });
 }
 
 async function syncToRemote(force = false) {
