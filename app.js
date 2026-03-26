@@ -40,6 +40,18 @@ function normalizeProtocolPhases(data = {}) {
   return normalized;
 }
 
+function hasProtocolData(data) {
+  return !!data && typeof data === 'object' && Object.keys(data).length > 0;
+}
+
+function hasMeaningfulRemoteState(data = {}) {
+  return hasProtocolData(data.skincare)
+    || (Array.isArray(data.focusPlanner) && data.focusPlanner.length > 0)
+    || !!(data.settings && Object.keys(data.settings).length > 0)
+    || !!(data.history && Object.keys(data.history).length > 0)
+    || !!(data.googleCalendar && Object.keys(data.googleCalendar).length > 0);
+}
+
 const DEFAULT_FOCUS_PLANNER = [
   {
     id: 'focus-exercise-default',
@@ -114,6 +126,7 @@ const DEFAULT_FOCUS_PLANNER = [
 ];
 
 let protocolData = normalizeProtocolPhases(readJsonStorage('customProtocol', DEFAULT_PROTOCOL));
+if (!Object.keys(protocolData).length) protocolData = normalizeProtocolPhases(DEFAULT_PROTOCOL);
 let historyLog   = readJsonStorage('skincareHistory', {});
 let settings = {
   startDate: localStorage.getItem('startDate') || formatLocalDateKey(new Date()),
@@ -231,8 +244,10 @@ function getRoutineSteps(phaseNum, phaseData, isPM, dayOfWeek) {
       routineSteps = isRetrieveNight ? (phaseData.PM_A || []) : (phaseData.PM_B || []);
     } else if (isRetrieveNight) {
       routineSteps = phaseData.PM_A || [];
-    } else if (['Tuesday', 'Thursday'].includes(dayOfWeek)) {
-      routineSteps = phaseData.PM_B_TueThu || phaseData.PM_B || [];
+    } else if (dayOfWeek === 'Tuesday') {
+      routineSteps = phaseData.PM_B_Tue || phaseData.PM_B_TueThu || phaseData.PM_B || [];
+    } else if (dayOfWeek === 'Thursday') {
+      routineSteps = phaseData.PM_B_Thu || phaseData.PM_B_TueThu || phaseData.PM_B || [];
     } else if (dayOfWeek === 'Saturday') {
       routineSteps = phaseData.PM_B_Sat || phaseData.PM_B || [];
     } else if (dayOfWeek === 'Sunday') {
@@ -281,7 +296,8 @@ function getCurrentRoutineContext(offsetDays = selectedRoutineOffset) {
   if (isPM) {
     const isRetrieveNight = ['Monday', 'Wednesday', 'Friday'].includes(dayOfWeek);
     if (phaseNum <= 2 || isRetrieveNight) routineKey = 'PM_A';
-    else if (['Tuesday', 'Thursday'].includes(dayOfWeek)) routineKey = 'PM_B_TueThu';
+    else if (dayOfWeek === 'Tuesday') routineKey = 'PM_B_Tue';
+    else if (dayOfWeek === 'Thursday') routineKey = 'PM_B_Thu';
     else if (dayOfWeek === 'Saturday') routineKey = 'PM_B_Sat';
     else if (dayOfWeek === 'Sunday') routineKey = 'PM_B_Sun';
     else routineKey = 'PM_B';
@@ -369,7 +385,7 @@ function buildRemoteStatePayload() {
 }
 
 function applyRemoteState(remoteData = {}) {
-  if (remoteData.skincare && typeof remoteData.skincare === 'object') {
+  if (hasProtocolData(remoteData.skincare)) {
     protocolData = normalizeProtocolPhases(remoteData.skincare);
   }
   if (remoteData.history && typeof remoteData.history === 'object') {
@@ -488,14 +504,21 @@ async function initRemoteSync() {
   renderSyncStatus();
   try {
     const remoteData = await fetchRemoteState();
-    applyRemoteState(remoteData);
     remoteSyncState.initialized = true;
-    remoteSyncState.lastSyncedAt = new Date().toISOString();
-    remoteSyncState.source = 'remote';
-    remoteSyncState.error = '';
-    renderRoutine();
-    if (!document.getElementById('view-settings')?.classList.contains('hidden')) {
-      renderProtocolEditor();
+
+    if (hasMeaningfulRemoteState(remoteData)) {
+      applyRemoteState(remoteData);
+      remoteSyncState.lastSyncedAt = new Date().toISOString();
+      remoteSyncState.source = 'remote';
+      remoteSyncState.error = '';
+      renderRoutine();
+      if (!document.getElementById('view-settings')?.classList.contains('hidden')) {
+        renderProtocolEditor();
+      }
+    } else {
+      remoteSyncState.source = 'local';
+      remoteSyncState.error = '';
+      await syncToRemote(true);
     }
   } catch (error) {
     remoteSyncState.initialized = true;
@@ -1191,6 +1214,8 @@ function renderHistory() {
 const ROUTINE_TYPES = [
   { key:'AM',         label:'☀️ AM'       },
   { key:'PM_A',       label:'🌙 PM-A'     },
+  { key:'PM_B_Tue',   label:'🌙 Tue'      },
+  { key:'PM_B_Thu',   label:'🌙 Thu'      },
   { key:'PM_B',       label:'🌙 PM-B'     },
   { key:'PM_B_TueThu',label:'🌙 Tue/Thu'  },
   { key:'PM_B_Sat',   label:'🌙 Sat'      },
