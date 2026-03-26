@@ -17,6 +17,15 @@ const GOOGLE_CALENDAR_CONFIG = {
   scope: 'https://www.googleapis.com/auth/calendar.readonly'
 };
 const GOOGLE_CALENDAR_DAYS_AHEAD = 4;
+
+function formatLocalDateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
 const DEFAULT_FOCUS_PLANNER = [
   {
     id: 'focus-exercise-default',
@@ -93,7 +102,7 @@ const DEFAULT_FOCUS_PLANNER = [
 let protocolData = readJsonStorage('customProtocol', DEFAULT_PROTOCOL);
 let historyLog   = readJsonStorage('skincareHistory', {});
 let settings = {
-  startDate: localStorage.getItem('startDate') || new Date().toISOString().split('T')[0],
+  startDate: localStorage.getItem('startDate') || formatLocalDateKey(new Date()),
   phaseDays: parseInt(localStorage.getItem('phaseDays'), 10) || 14
 };
 let focusPlanner = mergeSeedFocusPlanner(
@@ -545,7 +554,7 @@ function startNextTaskCountdown(agenda, offsetDays = 0) {
 
 function getDateKey(offsetDays = 0) {
   const date = getDateForOffset(offsetDays);
-  return date.toISOString().split('T')[0];
+  return formatLocalDateKey(date);
 }
 
 function getWeekdayForOffset(offsetDays = 0) {
@@ -702,7 +711,7 @@ function calculatePhase(forDate = new Date()) {
   return phaseNum > maxPhase ? maxPhase : phaseNum;
 }
 
-function getTodayKey() { return new Date().toISOString().split('T')[0]; }
+function getTodayKey() { return formatLocalDateKey(new Date()); }
 
 function setRoutineDayOffset(offsetDays = 0) {
   selectedRoutineOffset = Math.max(0, Number(offsetDays) || 0);
@@ -1560,7 +1569,7 @@ function addDays(date, days) {
 }
 
 function getDateKeyFromDate(date) {
-  return date.toISOString().split('T')[0];
+  return formatLocalDateKey(date);
 }
 
 function buildDateRangeKeys(startDate, endDateInclusive) {
