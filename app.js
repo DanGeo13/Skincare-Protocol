@@ -123,6 +123,7 @@ let googleCalendarState = {
   availableCalendars: [],
   selectedCalendarIds: readJsonStorage('googleCalendarSelectedIds', []),
   eventsByDate: {},
+  eventCountsByCalendar: {},
   syncError: '',
   isSyncing: false
 };
@@ -1439,7 +1440,7 @@ function renderGoogleCalendarSettings() {
   const selected = new Set(getSelectedCalendarIds());
   listEl.innerHTML = googleCalendarState.availableCalendars.map(calendar => `
     <label class="focus-flags" style="display:flex;justify-content:space-between;margin-bottom:8px">
-      <span>${escHtml(calendar.summary || calendar.id)}</span>
+      <span>${escHtml(calendar.summary || calendar.id)}${googleCalendarState.signedIn ? ` (${googleCalendarState.eventCountsByCalendar[calendar.id] || 0})` : ''}</span>
       <input
         type="checkbox"
         ${selected.has(calendar.id) ? 'checked' : ''}
@@ -1518,6 +1519,7 @@ async function disconnectGoogleCalendar() {
   googleCalendarState.signedIn = false;
   googleCalendarState.availableCalendars = [];
   googleCalendarState.eventsByDate = {};
+  googleCalendarState.eventCountsByCalendar = {};
   googleCalendarState.syncError = '';
   renderGoogleCalendarSettings();
   renderRoutine();
@@ -1641,6 +1643,7 @@ async function loadGoogleCalendarEvents() {
   const rangeStart = startOfDay(new Date());
   const rangeEnd = addDays(rangeStart, GOOGLE_CALENDAR_DAYS_AHEAD + 1);
   const eventsByDate = {};
+  const eventCountsByCalendar = {};
 
   buildDateRangeKeys(rangeStart, addDays(rangeEnd, -1)).forEach(dateKey => {
     eventsByDate[dateKey] = [];
@@ -1657,6 +1660,7 @@ async function loadGoogleCalendarEvents() {
       maxResults: 100
     });
     const calendarMeta = googleCalendarState.availableCalendars.find(calendar => calendar.id === calendarId);
+    eventCountsByCalendar[calendarId] = (response.result.items || []).length;
     (response.result.items || []).forEach(event => {
       mapGoogleEventToAgendaItems(event, calendarMeta, rangeStart, rangeEnd).forEach(item => {
         if (!eventsByDate[item.dateKey]) eventsByDate[item.dateKey] = [];
@@ -1672,6 +1676,7 @@ async function loadGoogleCalendarEvents() {
   });
 
   googleCalendarState.eventsByDate = eventsByDate;
+  googleCalendarState.eventCountsByCalendar = eventCountsByCalendar;
 }
 
 function toggleGoogleCalendarSelection(calendarId, checked) {
