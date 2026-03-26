@@ -226,11 +226,11 @@ function selectEditorFocus(area) {
 }
 
 function applyTheme(isPM) {
-  document.body.classList.toggle('theme-pm', isPM);
-  document.body.classList.toggle('theme-am', !isPM);
+  document.body.classList.add('theme-pm');
+  document.body.classList.remove('theme-am');
   const themeColor = document.querySelector('meta[name="theme-color"]');
   if (themeColor) {
-    themeColor.setAttribute('content', isPM ? '#17324b' : '#ece7de');
+    themeColor.setAttribute('content', '#17324b');
   }
 }
 
