@@ -1919,6 +1919,7 @@
         <button class="upcoming-control-btn" type="button" onclick="shiftRoutineDay(-1)">Previous day</button>
         <button class="upcoming-control-btn" type="button" onclick="setRoutineDayOffset(0)">Today</button>
         <button class="upcoming-control-btn" type="button" onclick="shiftRoutineDay(1)">Next day</button>
+        <input class="upcoming-control-btn" style="padding:8px 12px" type="date" id="routine-date-picker" onchange="jumpToRoutineDate(this.value)" />
       </div>
       <div class="upcoming-list" id="upcoming-list"></div>
     </section>
@@ -1969,6 +1970,10 @@
 
     <!-- Phase picker -->
     <div class="pill-row" id="phase-picker"></div>
+    <div class="pill-row">
+      <button class="pill-btn" id="move-phase-back-btn" type="button" onclick="moveCurrentPhase(-1)">Move earlier</button>
+      <button class="pill-btn" id="move-phase-forward-btn" type="button" onclick="moveCurrentPhase(1)">Move later</button>
+    </div>
 
     <!-- Phase name editor -->
     <div class="phase-name-row">
@@ -2017,6 +2022,13 @@
       <div class="editor-context-main">
         <span class="editor-context-value" id="focus-editor-context">Exercise blocks</span>
       </div>
+    </div>
+
+    <div class="pill-row" id="focus-phase-picker"></div>
+    <div class="pill-row">
+      <button class="pill-btn" id="focus-move-phase-back-btn" type="button" onclick="moveCurrentPhase(-1)">Move earlier</button>
+      <button class="pill-btn" id="focus-move-phase-forward-btn" type="button" onclick="moveCurrentPhase(1)">Move later</button>
+      <button class="pill-btn" id="focus-delete-phase-btn" type="button" onclick="deleteCurrentPhase()">Delete phase</button>
     </div>
 
     <div id="focus-editor-list"></div>
