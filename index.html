@@ -643,8 +643,12 @@
       flex-direction: column;
       gap: 10px;
       padding-bottom: 8px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 28px;
     }
     .agenda-card {
+      --kind-color: #74b8f2;
       display: grid;
       grid-template-columns: 74px minmax(0, 1fr) auto;
       gap: 12px;
@@ -657,11 +661,25 @@
       -webkit-backdrop-filter: blur(14px);
       box-shadow: 0 24px 44px rgba(0,0,0,0.22);
       transition: transform 0.24s ease, opacity 0.24s ease, border-color 0.24s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .agenda-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--kind-color) 92%, white 8%), color-mix(in srgb, var(--kind-color) 64%, transparent 36%));
     }
     .agenda-card.is-next {
       border-color: rgba(116,184,242,0.3);
       box-shadow: 0 0 0 1px rgba(116,184,242,0.18), 0 24px 44px rgba(0,0,0,0.24);
     }
+    .agenda-card.kind-skincare { --kind-color: #8fd09a; }
+    .agenda-card.kind-exercise { --kind-color: #f7a34b; }
+    .agenda-card.kind-mindfulness { --kind-color: #cb9dff; }
+    .agenda-card.kind-engagement { --kind-color: #5fd3d8; }
+    .agenda-card.kind-calendar { --kind-color: #ff6f91; }
     .agenda-card.done {
       opacity: 0.5;
       background: rgba(14,20,36,0.72);
@@ -669,7 +687,7 @@
     .agenda-time {
       font-size: 0.92rem;
       font-weight: 800;
-      color: #d4ebfd;
+      color: var(--kind-color);
       letter-spacing: 0.03em;
     }
     .agenda-time-note {
@@ -706,8 +724,8 @@
       font-size: 0.68rem;
       font-weight: 700;
       background: var(--timer-bg);
-      color: #d6ecff;
-      border: 1px solid rgba(116,184,242,0.14);
+      color: color-mix(in srgb, var(--kind-color) 82%, white 18%);
+      border: 1px solid color-mix(in srgb, var(--kind-color) 26%, transparent 74%);
     }
     .agenda-action {
       width: 34px;
@@ -974,6 +992,57 @@
       box-shadow: 0 0 0 1px rgba(116,184,242,0.18), 0 18px 34px rgba(0,0,0,0.2);
     }
     .agenda-action:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    .agenda-progress-line {
+      position: absolute;
+      left: 32px;
+      top: 18px;
+      bottom: 18px;
+      width: 2px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .agenda-progress-fill {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(116,184,242,0.52));
+      border-radius: 999px;
+    }
+    .agenda-progress-marker {
+      position: absolute;
+      left: 50%;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: #d8eeff;
+      box-shadow: 0 0 0 4px rgba(116,184,242,0.18), 0 0 18px rgba(116,184,242,0.34);
+    }
+    .upcoming-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .upcoming-control-btn {
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--text-primary);
+      border-radius: 999px;
+      padding: 9px 14px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+    }
+    .upcoming-control-btn:disabled {
       opacity: 0.45;
       cursor: default;
     }
@@ -1420,6 +1489,7 @@
     }
     .focus-editor-grid input,
     .focus-editor-grid select,
+    .focus-category-chip,
     .focus-editor-card textarea {
       width: 100%;
       background: var(--input-bg);
@@ -1430,6 +1500,11 @@
       font-family: inherit;
       padding: 8px 10px;
       outline: none;
+    }
+    .focus-category-chip {
+      display: flex;
+      align-items: center;
+      font-weight: 700;
     }
     .focus-editor-card textarea {
       min-height: 64px;
@@ -1464,6 +1539,43 @@
       background: var(--pill-active-bg);
       color: var(--pill-active-text);
       border-color: var(--pill-active-bg);
+    }
+    .focus-phase-row {
+      margin-top: 10px;
+    }
+    .focus-phase-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .focus-phases {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .focus-phase-pill {
+      border: 1px solid var(--card-border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .focus-phase-pill.active {
+      background: var(--pill-active-bg);
+      color: var(--pill-active-text);
+      border-color: var(--pill-active-bg);
+    }
+    .focus-phase-note {
+      display: block;
+      margin-top: 8px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
     }
     .focus-flags {
       display: flex;
@@ -1800,8 +1912,13 @@
       <div class="agenda-header">
         <div>
           <div class="agenda-title">Browse Days</div>
-          <div class="agenda-subtitle">Tap a day to preview what’s approaching.</div>
+          <div class="agenda-subtitle">Move forward and inspect what is coming.</div>
         </div>
+      </div>
+      <div class="upcoming-controls">
+        <button class="upcoming-control-btn" type="button" onclick="shiftRoutineDay(-1)">Previous day</button>
+        <button class="upcoming-control-btn" type="button" onclick="setRoutineDayOffset(0)">Today</button>
+        <button class="upcoming-control-btn" type="button" onclick="shiftRoutineDay(1)">Next day</button>
       </div>
       <div class="upcoming-list" id="upcoming-list"></div>
     </section>
@@ -1837,6 +1954,7 @@
       <button class="focus-switcher-btn" data-area="exercise" onclick="selectEditorFocus('exercise')">Exercise</button>
       <button class="focus-switcher-btn" data-area="mindfulness" onclick="selectEditorFocus('mindfulness')">Mindfulness</button>
       <button class="focus-switcher-btn" data-area="engagement" onclick="selectEditorFocus('engagement')">Engagements</button>
+      <button class="focus-switcher-btn" data-area="calendar" onclick="selectEditorFocus('calendar')">Calendar</button>
     </div>
 
     <div id="editor-panel-skincare" class="editor-panel">
@@ -1856,6 +1974,7 @@
     <div class="phase-name-row">
       <span class="phase-name-label">Phase name</span>
       <input class="phase-name-input" id="phase-name-input" type="text" placeholder="e.g. Phase 1 (Right Now)" oninput="savePhaseNameDebounced()"/>
+      <button class="editor-delete-btn" id="delete-phase-btn" type="button" onclick="deleteCurrentPhase()" title="Delete phase">✕</button>
     </div>
 
     <!-- Routine type picker -->
@@ -1909,6 +2028,13 @@
     </details>
     </div>
 
+    <div id="editor-panel-calendar" class="editor-panel hidden">
+    <div class="editor-context-card">
+      <span class="editor-context-label">Calendar integration</span>
+      <div class="editor-context-main">
+        <span class="editor-context-value">Google Calendar connection and selected calendars</span>
+      </div>
+    </div>
     <div class="section-label">Google Calendar</div>
     <div class="settings-card">
       <div class="settings-row" style="display:block">
@@ -1926,6 +2052,7 @@
           <div id="google-calendar-list" style="margin-top:8px"></div>
         </div>
       </div>
+    </div>
     </div>
 
     <!-- Advanced JSON -->
