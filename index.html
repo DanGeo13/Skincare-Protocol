@@ -1909,6 +1909,25 @@
     </details>
     </div>
 
+    <div class="section-label">Google Calendar</div>
+    <div class="settings-card">
+      <div class="settings-row" style="display:block">
+        <div style="margin-bottom:10px">
+          <label>Connection</label>
+          <div id="google-calendar-status" style="margin-top:6px;color:var(--muted,#6b7280)">Checking Google Calendar availability…</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="json-import-btn" type="button" id="google-calendar-connect-btn" onclick="handleGoogleCalendarAuth()">Connect Google Calendar</button>
+          <button class="json-import-btn" type="button" id="google-calendar-refresh-btn" onclick="refreshGoogleCalendarEvents()">Refresh Calendar</button>
+          <button class="json-import-btn" type="button" id="google-calendar-disconnect-btn" onclick="disconnectGoogleCalendar()">Disconnect</button>
+        </div>
+        <div>
+          <label>Selected calendars</label>
+          <div id="google-calendar-list" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Advanced JSON -->
     <div class="section-label">All Data</div>
     <details class="json-details">
@@ -1936,6 +1955,8 @@
 
   <script src="protocol.js"></script>
   <script src="app.js"></script>
+  <script async defer src="https://apis.google.com/js/api.js" onload="onGoogleApiLoaded()"></script>
+  <script async defer src="https://accounts.google.com/gsi/client" onload="onGoogleIdentityLoaded()"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
   </script>
