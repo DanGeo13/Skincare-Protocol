@@ -26,6 +26,16 @@ function formatLocalDateKey(date) {
   ].join('-');
 }
 
+function normalizeProtocolPhases(data = {}) {
+  const normalized = {};
+  Object.keys(data)
+    .sort((a, b) => Number(a) - Number(b))
+    .forEach((key, index) => {
+      normalized[String(index + 1)] = data[key];
+    });
+  return normalized;
+}
+
 const DEFAULT_FOCUS_PLANNER = [
   {
     id: 'focus-exercise-default',
@@ -99,7 +109,7 @@ const DEFAULT_FOCUS_PLANNER = [
   }
 ];
 
-let protocolData = readJsonStorage('customProtocol', DEFAULT_PROTOCOL);
+let protocolData = normalizeProtocolPhases(readJsonStorage('customProtocol', DEFAULT_PROTOCOL));
 let historyLog   = readJsonStorage('skincareHistory', {});
 let settings = {
   startDate: localStorage.getItem('startDate') || formatLocalDateKey(new Date()),
@@ -124,6 +134,7 @@ let googleCalendarState = {
   selectedCalendarIds: readJsonStorage('googleCalendarSelectedIds', []),
   eventsByDate: {},
   eventCountsByCalendar: {},
+  loadedDaysAhead: GOOGLE_CALENDAR_DAYS_AHEAD,
   syncError: '',
   isSyncing: false
 };
@@ -144,12 +155,15 @@ document.getElementById('set-phase-days').value   = settings.phaseDays;
 function switchTab(tab) {
   const settingsView = document.getElementById('view-settings');
   if (settingsView && !settingsView.classList.contains('hidden')) {
-    clearTimeout(autoSaveTimer);
-    clearTimeout(phaseNameTimeout);
-    clearTimeout(focusSaveTimer);
-    saveEditorState();
-    flushPhaseName();
-    saveFocusState();
+    if (editorFocusArea === 'skincare') {
+      clearTimeout(autoSaveTimer);
+      clearTimeout(phaseNameTimeout);
+      saveEditorState();
+      flushPhaseName();
+    } else if (FOCUS_CATEGORIES.some(category => category.key === editorFocusArea)) {
+      clearTimeout(focusSaveTimer);
+      saveFocusState();
+    }
   }
 
   ['routine','history','settings'].forEach(t => {
@@ -174,7 +188,7 @@ function selectEditorFocus(area) {
     clearTimeout(phaseNameTimeout);
     flushPhaseName();
     persistProtocol();
-  } else {
+  } else if (FOCUS_CATEGORIES.some(category => category.key === editorFocusArea)) {
     clearTimeout(focusSaveTimer);
     saveFocusState();
   }
@@ -280,7 +294,8 @@ function normalizeFocusItem(item = {}) {
     time: item.time || '07:00',
     duration: Number(item.duration) || 30,
     days: Array.isArray(item.days) && item.days.length ? item.days : DAY_NAMES.slice(0, 5),
-    flexible: item.flexible !== false
+    flexible: item.flexible !== false,
+    phases: Array.isArray(item.phases) ? item.phases.map(phase => String(phase)).filter(Boolean) : []
   };
 }
 
@@ -367,9 +382,10 @@ function formatNextTaskDisplay(ms) {
   };
 }
 
-function generateTodayFocusBlocks(dayOfWeek) {
+function generateTodayFocusBlocks(dayOfWeek, phaseNum) {
   const todaysItems = focusPlanner
     .filter(item => item.days.includes(dayOfWeek) && item.name.trim())
+    .filter(item => !item.phases?.length || item.phases.includes(String(phaseNum)))
     .map(item => normalizeFocusItem(item))
     .sort((a, b) => toMinutes(a.time) - toMinutes(b.time));
 
@@ -402,7 +418,7 @@ function toggleFocusBlock(id) {
 
 function renderFocusTimeline(dayOfWeek) {
   const container = document.getElementById('focus-timeline');
-  const blocks = generateTodayFocusBlocks(dayOfWeek);
+  const blocks = generateTodayFocusBlocks(dayOfWeek, getCurrentRoutineContext().phaseNum);
   const today = getTodayKey();
   const done = historyLog[today]?.focusDone || [];
 
@@ -475,9 +491,9 @@ function getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay) {
   ];
 }
 
-function getFocusAgendaItems(dayOfWeek, historyDay) {
+function getFocusAgendaItems(dayOfWeek, historyDay, phaseNum) {
   const done = historyDay?.focusDone || [];
-  return generateTodayFocusBlocks(dayOfWeek).map(block => ({
+  return generateTodayFocusBlocks(dayOfWeek, phaseNum).map(block => ({
     id: block.id,
     kind: 'focus',
     category: block.category,
@@ -502,7 +518,7 @@ function buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, offsetDays = 0) {
   const historyDay = historyLog[dateKey] || {};
   return [
     ...getSkincareAgendaItems(phaseNum, phaseData, dayOfWeek, historyDay),
-    ...getFocusAgendaItems(dayOfWeek, historyDay),
+    ...getFocusAgendaItems(dayOfWeek, historyDay, phaseNum),
     ...getCalendarAgendaItems(offsetDays)
   ].sort((a, b) => toMinutes(a.scheduledStart) - toMinutes(b.scheduledStart));
 }
@@ -521,13 +537,13 @@ function startNextTaskCountdown(agenda, offsetDays = 0) {
       if (countdownUnitEl) countdownUnitEl.innerText = '';
       noteEl.innerText = `Viewing ${getRelativeDayLabel(offsetDays).toLowerCase()}`;
       if (panelTimeEl) panelTimeEl.innerText = agenda[0]
-        ? formatClock(agenda[0].scheduledStart).replace(' AM', '').replace(' PM', '')
+        ? (agenda[0].allDay ? 'All day' : formatClock(agenda[0].scheduledStart).replace(' AM', '').replace(' PM', ''))
         : '--';
       return;
     }
 
     const now = new Date();
-    const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+    const nowMinutes = getCurrentMinutes();
     const nextItem = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes);
 
     if (!nextItem) {
@@ -545,8 +561,8 @@ function startNextTaskCountdown(agenda, offsetDays = 0) {
     const countdown = formatNextTaskDisplay(countdownMs);
     if (countdownNumberEl) countdownNumberEl.innerText = countdown.number;
     if (countdownUnitEl) countdownUnitEl.innerText = countdown.unit;
-    noteEl.innerText = `${formatClock(nextItem.scheduledStart)} · ${nextItem.name}`;
-    if (panelTimeEl) panelTimeEl.innerText = formatCountdown(countdownMs);
+    noteEl.innerText = `${nextItem.allDay ? 'All day' : formatClock(nextItem.scheduledStart)} · ${nextItem.name}`;
+    if (panelTimeEl) panelTimeEl.innerText = nextItem.allDay ? 'All day' : formatCountdown(countdownMs);
   }
 
   renderCountdown();
@@ -565,11 +581,13 @@ function getWeekdayForOffset(offsetDays = 0) {
 
 function buildUpcomingPreview(daysAhead = 3) {
   const previews = [];
-  for (let offset = 0; offset <= daysAhead; offset++) {
+  const startOffset = Math.max(0, selectedRoutineOffset - 2);
+  const endOffset = Math.max(startOffset + daysAhead, selectedRoutineOffset + 2);
+  for (let offset = startOffset; offset <= endOffset; offset++) {
     const dayOfWeek = getWeekdayForOffset(offset);
     const phaseNum = calculatePhase(getDateForOffset(offset));
     const phaseData = protocolData[String(phaseNum)] || protocolData[phaseNum] || protocolData[Object.keys(protocolData)[0]];
-    const agenda = buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, offset);
+    const agenda = getVisibleAgendaItems(buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, offset), offset);
     const firstItem = agenda[0];
 
     previews.push({
@@ -600,9 +618,32 @@ function renderUpcomingPreview() {
   `).join('');
 }
 
-function getAgendaPresentation(agenda, isPM) {
+function getCurrentMinutes() {
   const now = new Date();
-  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  return (now.getHours() * 60) + now.getMinutes();
+}
+
+function getAgendaItemCategoryClass(item) {
+  if (item.kind === 'skincare') return 'kind-skincare';
+  if (item.kind === 'calendar') return 'kind-calendar';
+  if (item.category === 'exercise') return 'kind-exercise';
+  if (item.category === 'mindfulness') return 'kind-mindfulness';
+  if (item.category === 'engagement') return 'kind-engagement';
+  return 'kind-generic';
+}
+
+function isAgendaItemVisible(item, offsetDays = 0) {
+  if (offsetDays !== 0) return true;
+  if (item.kind !== 'calendar') return true;
+  return toMinutes(item.scheduledEnd) + 60 > getCurrentMinutes();
+}
+
+function getVisibleAgendaItems(agenda, offsetDays = 0) {
+  return agenda.filter(item => isAgendaItemVisible(item, offsetDays));
+}
+
+function getAgendaPresentation(agenda, isPM) {
+  const nowMinutes = getCurrentMinutes();
   const nextItem = agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes) || agenda.find(item => !item.done) || null;
   const liveItem = agenda.find(item => {
     const start = toMinutes(item.scheduledStart);
@@ -614,18 +655,19 @@ function getAgendaPresentation(agenda, isPM) {
 }
 
 function renderHeroPanels(agenda, dayLabel, offsetDays = 0) {
-  const { nextItem } = getAgendaPresentation(agenda, false);
+  const { nextItem, liveItem } = getAgendaPresentation(agenda, false);
+  const heroItem = offsetDays === 0 ? (liveItem || nextItem) : nextItem;
   const nextTitle = document.getElementById('next-panel-title');
   const nextSubtitle = document.getElementById('next-panel-subtitle');
   const nextTime = document.getElementById('next-panel-time');
   const agendaSubtitle = document.getElementById('agenda-subtitle');
 
-  if (nextItem) {
-    nextTitle.innerText = nextItem.name;
-    nextSubtitle.innerText = nextItem.kind === 'skincare'
-      ? `${nextItem.isPM ? 'Evening' : 'Morning'} routine · ${formatClock(nextItem.scheduledStart)}`
-      : `${nextItem.category} · ${formatClock(nextItem.scheduledStart)}`;
-    nextTime.innerText = formatClock(nextItem.scheduledStart).replace(' AM', '').replace(' PM', '');
+  if (heroItem) {
+    nextTitle.innerText = heroItem.name;
+    nextSubtitle.innerText = heroItem.kind === 'skincare'
+      ? `${heroItem.isPM ? 'Evening' : 'Morning'} routine · ${formatClock(heroItem.scheduledStart)}`
+      : `${heroItem.category} · ${heroItem.allDay ? 'All day' : formatClock(heroItem.scheduledStart)}`;
+    nextTime.innerText = heroItem.allDay ? 'All day' : formatClock(heroItem.scheduledStart).replace(' AM', '').replace(' PM', '');
   } else {
     nextTitle.innerText = offsetDays === 0 ? 'Nothing else scheduled' : 'No events scheduled';
     nextSubtitle.innerText = offsetDays === 0 ? 'You are clear for the rest of today' : `Nothing planned for ${dayLabel.toLowerCase()}`;
@@ -648,13 +690,14 @@ function renderAgenda(agenda, offsetDays = 0) {
     return;
   }
 
-  const now = new Date();
-  const nowMinutes = (now.getHours() * 60) + now.getMinutes();
+  const nowMinutes = getCurrentMinutes();
   const nextId = offsetDays === 0 ? agenda.find(item => !item.done && toMinutes(item.scheduledStart) >= nowMinutes)?.id : agenda.find(item => !item.done)?.id;
 
   agenda.forEach(item => {
     const card = document.createElement('div');
-    card.className = `agenda-card${item.done ? ' done' : ''}${item.id === nextId ? ' is-next' : ''}`;
+    card.className = `agenda-card ${getAgendaItemCategoryClass(item)}${item.done ? ' done' : ''}${item.id === nextId ? ' is-next' : ''}`;
+    card.dataset.startMinutes = String(toMinutes(item.scheduledStart));
+    card.dataset.endMinutes = String(toMinutes(item.scheduledEnd));
     const action = document.createElement('button');
     action.className = 'agenda-action';
     const canToggle = offsetDays === 0 && item.kind !== 'calendar';
@@ -675,8 +718,8 @@ function renderAgenda(agenda, offsetDays = 0) {
 
     card.innerHTML = `
       <div>
-        <div class="agenda-time">${formatClock(item.scheduledStart)}</div>
-        <span class="agenda-time-note">${item.duration} min block</span>
+        <div class="agenda-time">${item.allDay ? 'All day' : formatClock(item.scheduledStart)}</div>
+        <span class="agenda-time-note">${item.allDay ? 'Calendar hold' : `${item.duration} min block`}</span>
       </div>
       <div>
         <div class="agenda-name">${escHtml(item.name)}</div>
@@ -695,7 +738,32 @@ function renderAgenda(agenda, offsetDays = 0) {
     container.appendChild(card);
   });
 
+  renderDayProgressLine(agenda, offsetDays);
   startNextTaskCountdown(agenda, offsetDays);
+}
+
+function renderDayProgressLine(agenda, offsetDays = 0) {
+  const container = document.getElementById('routine-container');
+  if (!container) return;
+
+  const existing = container.querySelector('.agenda-progress-line');
+  if (existing) existing.remove();
+  if (offsetDays !== 0 || !agenda.length) return;
+
+  const line = document.createElement('div');
+  line.className = 'agenda-progress-line';
+  const fill = document.createElement('div');
+  fill.className = 'agenda-progress-fill';
+  const marker = document.createElement('div');
+  marker.className = 'agenda-progress-marker';
+
+  const progressPct = Math.max(0, Math.min(1, getCurrentMinutes() / (24 * 60)));
+  fill.style.height = `${progressPct * 100}%`;
+  marker.style.top = `${progressPct * 100}%`;
+
+  line.appendChild(fill);
+  line.appendChild(marker);
+  container.appendChild(line);
 }
 
 // ══════════════════════════════════════════
@@ -715,8 +783,15 @@ function calculatePhase(forDate = new Date()) {
 function getTodayKey() { return formatLocalDateKey(new Date()); }
 
 function setRoutineDayOffset(offsetDays = 0) {
-  selectedRoutineOffset = Math.max(0, Number(offsetDays) || 0);
+  selectedRoutineOffset = Math.max(0, Math.min(30, Number(offsetDays) || 0));
+  if (googleCalendarState.signedIn && selectedRoutineOffset > googleCalendarState.loadedDaysAhead) {
+    refreshGoogleCalendarEvents();
+  }
   renderRoutine();
+}
+
+function shiftRoutineDay(delta) {
+  setRoutineDayOffset(selectedRoutineOffset + delta);
 }
 
 function toggleStep(index, totalSteps, isPM) {
@@ -751,7 +826,7 @@ function renderRoutine() {
   document.getElementById('phase-badge').innerText   = dayLabel;
   document.getElementById('time-context').innerText  = `${formatDateHeading(now)} · ${selectedRoutineOffset === 0 ? 'Showing the rest of today' : 'Previewing recurring items ahead'}`;
 
-  const agenda = buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, selectedRoutineOffset);
+  const agenda = getVisibleAgendaItems(buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, selectedRoutineOffset), selectedRoutineOffset);
 
   const completableItems = agenda.filter(item => item.kind !== 'calendar');
   const completedCount = completableItems.filter(item => item.done).length;
@@ -859,7 +934,7 @@ const FOCUS_CATEGORIES = [
 ];
 
 function getActiveFocusCategory() {
-  return editorFocusArea === 'skincare' ? 'exercise' : editorFocusArea;
+  return FOCUS_CATEGORIES.some(category => category.key === editorFocusArea) ? editorFocusArea : 'exercise';
 }
 
 function getRoutineLabel(routineKey) {
@@ -878,26 +953,37 @@ function renderProtocolEditor() {
   const liveLabel = `${liveContext.phaseData?.name || `Phase ${liveContext.phaseNum}`} · ${getRoutineLabel(liveContext.routineKey)} · ${liveContext.dayOfWeek}`;
   document.getElementById('editor-live-context').innerText = liveLabel;
   document.getElementById('editor-panel-skincare').classList.toggle('hidden', editorFocusArea !== 'skincare');
-  document.getElementById('editor-panel-focus').classList.toggle('hidden', editorFocusArea === 'skincare');
+  document.getElementById('editor-panel-focus').classList.toggle('hidden', !FOCUS_CATEGORIES.some(category => category.key === editorFocusArea));
+  document.getElementById('editor-panel-calendar').classList.toggle('hidden', editorFocusArea !== 'calendar');
   Array.from(document.querySelectorAll('#editor-focus-switcher .focus-switcher-btn')).forEach(btn => {
     btn.classList.toggle('active', btn.dataset.area === editorFocusArea);
   });
-  renderPhasePicker();
-  renderRoutineTypePicker();
-  renderStepList();
-  renderFocusEditor();
+  if (editorFocusArea === 'skincare') {
+    renderPhasePicker();
+    renderRoutineTypePicker();
+    renderStepList();
+  }
+  if (FOCUS_CATEGORIES.some(category => category.key === editorFocusArea)) {
+    renderFocusEditor();
+  }
   // Sync phase name input
   const phaseName = protocolData[editorPhase]?.name || '';
-  document.getElementById('phase-name-input').value = phaseName;
+  const phaseInput = document.getElementById('phase-name-input');
+  if (phaseInput) phaseInput.value = phaseName;
   // Sync JSON export
-  document.getElementById('set-protocol-json').value = JSON.stringify(protocolData, null, 2);
+  const protocolJson = document.getElementById('set-protocol-json');
+  if (protocolJson) protocolJson.value = JSON.stringify(protocolData, null, 2);
   const activeCategory = getActiveFocusCategory();
-  document.getElementById('focus-editor-context').innerText = `${FOCUS_CATEGORIES.find(category => category.key === activeCategory)?.label || activeCategory} blocks`;
-  document.getElementById('set-focus-json').value = JSON.stringify(
-    focusPlanner.filter(item => item.category === activeCategory),
-    null,
-    2
-  );
+  const focusContext = document.getElementById('focus-editor-context');
+  if (focusContext) focusContext.innerText = `${FOCUS_CATEGORIES.find(category => category.key === activeCategory)?.label || activeCategory} blocks`;
+  const focusJson = document.getElementById('set-focus-json');
+  if (focusJson) {
+    focusJson.value = JSON.stringify(
+      focusPlanner.filter(item => item.category === activeCategory),
+      null,
+      2
+    );
+  }
   syncExportTextareas();
   renderGoogleCalendarSettings();
 }
@@ -907,6 +993,8 @@ function renderPhasePicker() {
   document.getElementById('phase-picker').innerHTML =
     phases.map(p => `<button class="pill-btn${editorPhase===p?' active':''}" onclick="selectEditorPhase('${p}')">${protocolData[p].name||'Phase '+p}</button>`).join('') +
     `<button class="pill-btn add-pill" onclick="addPhase()">＋</button>`;
+  const deleteBtn = document.getElementById('delete-phase-btn');
+  if (deleteBtn) deleteBtn.disabled = phases.length <= 1;
 }
 
 function renderRoutineTypePicker() {
@@ -951,6 +1039,29 @@ function addPhase() {
   editorPhase = newKey;
   persistProtocol();
   renderProtocolEditor();
+}
+
+function deleteCurrentPhase() {
+  const phaseKeys = Object.keys(protocolData).sort((a, b) => Number(a) - Number(b));
+  if (phaseKeys.length <= 1) return;
+  if (!confirm(`Delete ${protocolData[editorPhase]?.name || `Phase ${editorPhase}`}?`)) return;
+
+  const deletedPhase = Number(editorPhase);
+  delete protocolData[editorPhase];
+  protocolData = normalizeProtocolPhases(protocolData);
+  focusPlanner = focusPlanner.map(item => normalizeFocusItem({
+    ...item,
+    phases: (item.phases || [])
+      .map(Number)
+      .filter(phase => phase !== deletedPhase)
+      .map(phase => String(phase > deletedPhase ? phase - 1 : phase))
+  }));
+  persistFocusPlanner();
+  const nextKeys = Object.keys(protocolData).sort((a, b) => Number(a) - Number(b));
+  editorPhase = nextKeys[Math.max(0, Math.min(nextKeys.length - 1, phaseKeys.indexOf(String(deletedPhase)) - 1))] || '1';
+  persistProtocol();
+  renderProtocolEditor();
+  renderRoutine();
 }
 
 // ── Step list ──
@@ -1152,6 +1263,7 @@ function renderFocusEditor() {
   container.innerHTML = '';
   const activeCategory = getActiveFocusCategory();
   const filteredPlanner = focusPlanner.filter(item => item.category === activeCategory);
+  const phaseOptions = Object.keys(protocolData).sort((a, b) => Number(a) - Number(b));
 
   if (!filteredPlanner.length) {
     container.innerHTML = '<div class="editor-empty">No focus blocks yet for this activity focus.</div>';
@@ -1163,6 +1275,9 @@ function renderFocusEditor() {
     const dayButtons = DAYS.map(day => `
       <button class="focus-day-pill${normalized.days.includes(day) ? ' active' : ''}" onclick="toggleFocusDay(this)" data-day="${day}" type="button">${day.slice(0, 3)}</button>
     `).join('');
+    const phaseButtons = phaseOptions.map(phase => `
+      <button class="focus-phase-pill${normalized.phases.includes(phase) ? ' active' : ''}" onclick="toggleFocusPhase(this)" data-phase="${phase}" type="button">${protocolData[phase]?.name || `Phase ${phase}`}</button>
+    `).join('');
 
     container.insertAdjacentHTML('beforeend', `
       <div class="focus-editor-card" data-focus-index="${index}">
@@ -1172,9 +1287,7 @@ function renderFocusEditor() {
           <input type="number" class="focus-duration-input" min="5" max="240" step="5" value="${normalized.duration}" placeholder="Minutes" oninput="scheduleFocusSave()"/>
         </div>
         <div class="focus-editor-grid">
-          <select class="focus-category-input" onchange="scheduleFocusSave()">
-            ${FOCUS_CATEGORIES.map(category => `<option value="${category.key}"${category.key === normalized.category ? ' selected' : ''}>${category.label}</option>`).join('')}
-          </select>
+          <div class="focus-category-chip">${escHtml(FOCUS_CATEGORIES.find(category => category.key === activeCategory)?.label || activeCategory)}</div>
           <div class="focus-flags">
             <input type="checkbox" class="focus-flex-input" ${normalized.flexible ? 'checked' : ''} onchange="scheduleFocusSave()"/>
             <span>Allow smart push</span>
@@ -1185,12 +1298,22 @@ function renderFocusEditor() {
         <div class="focus-editor-row">
           <div class="focus-days">${dayButtons}</div>
         </div>
+        <div class="focus-phase-row">
+          <div class="focus-phase-label">Phases</div>
+          <div class="focus-phases">${phaseButtons || '<span class="focus-phase-note">No phases available yet.</span>'}</div>
+          <div class="focus-phase-note">Leave all unselected to show this block in every phase.</div>
+        </div>
       </div>
     `);
   });
 }
 
 function toggleFocusDay(button) {
+  button.classList.toggle('active');
+  scheduleFocusSave();
+}
+
+function toggleFocusPhase(button) {
   button.classList.toggle('active');
   scheduleFocusSave();
 }
@@ -1212,7 +1335,8 @@ function saveFocusState() {
       time: card.querySelector('.focus-time-input')?.value || '07:00',
       duration: parseInt(card.querySelector('.focus-duration-input')?.value, 10) || 30,
       days,
-      flexible: Boolean(card.querySelector('.focus-flex-input')?.checked)
+      flexible: Boolean(card.querySelector('.focus-flex-input')?.checked),
+      phases: Array.from(card.querySelectorAll('.focus-phase-pill.active')).map(phaseButton => phaseButton.dataset.phase)
     });
   }).filter(item => item.name);
 
@@ -1319,7 +1443,7 @@ function savePhaseSettings() {
 function importFromJSON() {
   try {
     const parsed = JSON.parse(document.getElementById('set-protocol-json').value);
-    protocolData = parsed;
+    protocolData = normalizeProtocolPhases(parsed);
     editorPhase  = String(Object.keys(protocolData).sort((a,b)=>Number(a)-Number(b))[0] || '1');
     persistProtocol();
     renderProtocolEditor();
@@ -1419,7 +1543,7 @@ function renderGoogleCalendarSettings() {
     statusEl.innerText = `Ready to connect on ${window.location.origin}.`;
   } else {
     const eventCount = Object.values(googleCalendarState.eventsByDate).reduce((sum, items) => sum + items.length, 0);
-    statusEl.innerText = `Connected. ${eventCount} calendar item${eventCount === 1 ? '' : 's'} loaded across the next ${GOOGLE_CALENDAR_DAYS_AHEAD + 1} days.`;
+    statusEl.innerText = `Connected. ${eventCount} calendar item${eventCount === 1 ? '' : 's'} loaded across the next ${googleCalendarState.loadedDaysAhead + 1} days.`;
   }
 
   connectBtn.disabled = !googleCalendarState.gapiReady || !googleCalendarState.gisReady || !googleCalendarState.clientReady || googleCalendarState.isSyncing || !isHttpOrigin();
@@ -1641,7 +1765,8 @@ function mapGoogleEventToAgendaItems(event, calendarMeta, rangeStart, rangeEnd) 
 async function loadGoogleCalendarEvents() {
   const selectedIds = getSelectedCalendarIds();
   const rangeStart = startOfDay(new Date());
-  const rangeEnd = addDays(rangeStart, GOOGLE_CALENDAR_DAYS_AHEAD + 1);
+  const daysAhead = Math.max(GOOGLE_CALENDAR_DAYS_AHEAD, selectedRoutineOffset + 3);
+  const rangeEnd = addDays(rangeStart, daysAhead + 1);
   const eventsByDate = {};
   const eventCountsByCalendar = {};
 
@@ -1677,6 +1802,7 @@ async function loadGoogleCalendarEvents() {
 
   googleCalendarState.eventsByDate = eventsByDate;
   googleCalendarState.eventCountsByCalendar = eventCountsByCalendar;
+  googleCalendarState.loadedDaysAhead = daysAhead;
 }
 
 function toggleGoogleCalendarSelection(calendarId, checked) {
@@ -1693,6 +1819,8 @@ window.handleGoogleCalendarAuth = handleGoogleCalendarAuth;
 window.refreshGoogleCalendarEvents = refreshGoogleCalendarEvents;
 window.disconnectGoogleCalendar = disconnectGoogleCalendar;
 window.toggleGoogleCalendarSelection = toggleGoogleCalendarSelection;
+window.shiftRoutineDay = shiftRoutineDay;
+window.deleteCurrentPhase = deleteCurrentPhase;
 
 // Init
 syncExportTextareas();
