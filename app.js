@@ -121,6 +121,8 @@ let focusPlanner = mergeSeedFocusPlanner(
 ).map(normalizeFocusItem);
 
 let timerInterval = null;
+let timerAlarmInterval = null;
+let timerAudioContext = null;
 let nextTaskInterval = null;
 const timerSound  = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 let selectedRoutineOffset = 0;
@@ -295,7 +297,9 @@ function normalizeFocusItem(item = {}) {
     duration: Number(item.duration) || 30,
     days: Array.isArray(item.days) && item.days.length ? item.days : DAY_NAMES.slice(0, 5),
     flexible: item.flexible !== false,
-    phases: Array.isArray(item.phases) ? item.phases.map(phase => String(phase)).filter(Boolean) : []
+    phases: Array.isArray(item.phases)
+      ? item.phases.map(phase => String(phase)).filter(Boolean)
+      : (item.phase ? [String(item.phase)] : [])
   };
 }
 
@@ -794,6 +798,15 @@ function shiftRoutineDay(delta) {
   setRoutineDayOffset(selectedRoutineOffset + delta);
 }
 
+function jumpToRoutineDate(value) {
+  if (!value) return;
+  const target = new Date(`${value}T12:00:00`);
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+  setRoutineDayOffset(Math.max(0, diffDays));
+}
+
 function toggleStep(index, totalSteps, isPM) {
   if ('vibrate' in navigator) navigator.vibrate(50);
   const today = getTodayKey();
@@ -825,6 +838,8 @@ function renderRoutine() {
   const dayLabel = getRelativeDayLabel(selectedRoutineOffset);
   document.getElementById('phase-badge').innerText   = dayLabel;
   document.getElementById('time-context').innerText  = `${formatDateHeading(now)} · ${selectedRoutineOffset === 0 ? 'Showing the rest of today' : 'Previewing recurring items ahead'}`;
+  const picker = document.getElementById('routine-date-picker');
+  if (picker) picker.value = formatLocalDateKey(now);
 
   const agenda = getVisibleAgendaItems(buildAgendaForOffset(phaseNum, phaseData, dayOfWeek, selectedRoutineOffset), selectedRoutineOffset);
 
@@ -871,6 +886,8 @@ function fmtTime(s) {
 function startTimer(e, seconds) {
   e.stopPropagation();
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  stopTimerAlarm();
+  maybeRequestNotificationPermission();
   let rem = seconds;
   const display = document.getElementById('timer-display');
   display.classList.remove('hidden');
@@ -881,11 +898,78 @@ function startTimer(e, seconds) {
     if (rem <= 0) {
       clearInterval(timerInterval); timerInterval = null;
       display.innerText = '✅ Timer done!';
-      timerSound.play().catch(()=>{});
+      startTimerAlarm();
+      showTimerFinishedNotification();
       if ('vibrate' in navigator) navigator.vibrate([200,100,200,100,400]);
-      setTimeout(() => display.classList.add('hidden'), 4000);
+      setTimeout(() => {
+        display.classList.add('hidden');
+        stopTimerAlarm();
+      }, 15000);
     }
   }, 1000);
+}
+
+function maybeRequestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+function showTimerFinishedNotification() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    new Notification('Timer finished', {
+      body: 'Your protocol timer has completed.',
+      requireInteraction: true
+    });
+  } catch (_) {}
+}
+
+function ensureTimerAudioContext() {
+  if (!timerAudioContext) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) timerAudioContext = new AudioCtx();
+  }
+  if (timerAudioContext?.state === 'suspended') {
+    timerAudioContext.resume().catch(() => {});
+  }
+  return timerAudioContext;
+}
+
+function playAlarmPulse() {
+  const ctx = ensureTimerAudioContext();
+  if (!ctx) {
+    timerSound.currentTime = 0;
+    timerSound.play().catch(() => {});
+    return;
+  }
+
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.35);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.45);
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  oscillator.start();
+  oscillator.stop(ctx.currentTime + 0.48);
+}
+
+function startTimerAlarm() {
+  stopTimerAlarm();
+  playAlarmPulse();
+  timerAlarmInterval = setInterval(playAlarmPulse, 1200);
+}
+
+function stopTimerAlarm() {
+  if (timerAlarmInterval) {
+    clearInterval(timerAlarmInterval);
+    timerAlarmInterval = null;
+  }
 }
 
 // ══════════════════════════════════════════
@@ -964,6 +1048,7 @@ function renderProtocolEditor() {
     renderStepList();
   }
   if (FOCUS_CATEGORIES.some(category => category.key === editorFocusArea)) {
+    renderFocusPhasePicker();
     renderFocusEditor();
   }
   // Sync phase name input
@@ -975,11 +1060,14 @@ function renderProtocolEditor() {
   if (protocolJson) protocolJson.value = JSON.stringify(protocolData, null, 2);
   const activeCategory = getActiveFocusCategory();
   const focusContext = document.getElementById('focus-editor-context');
-  if (focusContext) focusContext.innerText = `${FOCUS_CATEGORIES.find(category => category.key === activeCategory)?.label || activeCategory} blocks`;
+  if (focusContext) focusContext.innerText = `${FOCUS_CATEGORIES.find(category => category.key === activeCategory)?.label || activeCategory} · ${protocolData[editorPhase]?.name || `Phase ${editorPhase}`}`;
   const focusJson = document.getElementById('set-focus-json');
   if (focusJson) {
     focusJson.value = JSON.stringify(
-      focusPlanner.filter(item => item.category === activeCategory),
+      focusPlanner.filter(item =>
+        item.category === activeCategory &&
+        (item.phases?.includes(editorPhase) || (!item.phases?.length && editorPhase === '1'))
+      ),
       null,
       2
     );
@@ -995,6 +1083,26 @@ function renderPhasePicker() {
     `<button class="pill-btn add-pill" onclick="addPhase()">＋</button>`;
   const deleteBtn = document.getElementById('delete-phase-btn');
   if (deleteBtn) deleteBtn.disabled = phases.length <= 1;
+  const moveBackBtn = document.getElementById('move-phase-back-btn');
+  const moveForwardBtn = document.getElementById('move-phase-forward-btn');
+  if (moveBackBtn) moveBackBtn.disabled = editorPhase === phases[0];
+  if (moveForwardBtn) moveForwardBtn.disabled = editorPhase === phases[phases.length - 1];
+}
+
+function renderFocusPhasePicker() {
+  const phases = Object.keys(protocolData).sort((a,b)=>Number(a)-Number(b));
+  const target = document.getElementById('focus-phase-picker');
+  if (target) {
+    target.innerHTML =
+      phases.map(p => `<button class="pill-btn${editorPhase===p?' active':''}" onclick="selectEditorPhase('${p}')">${protocolData[p].name||'Phase '+p}</button>`).join('') +
+      `<button class="pill-btn add-pill" onclick="addPhase()">＋</button>`;
+  }
+  const deleteBtn = document.getElementById('focus-delete-phase-btn');
+  if (deleteBtn) deleteBtn.disabled = phases.length <= 1;
+  const moveBackBtn = document.getElementById('focus-move-phase-back-btn');
+  const moveForwardBtn = document.getElementById('focus-move-phase-forward-btn');
+  if (moveBackBtn) moveBackBtn.disabled = editorPhase === phases[0];
+  if (moveForwardBtn) moveForwardBtn.disabled = editorPhase === phases[phases.length - 1];
 }
 
 function renderRoutineTypePicker() {
@@ -1005,6 +1113,7 @@ function renderRoutineTypePicker() {
 
 function selectEditorPhase(key) {
   if (editorFocusArea === 'skincare') saveEditorState();
+  else if (FOCUS_CATEGORIES.some(category => category.key === editorFocusArea)) saveFocusState();
   editorPhase = key;
   renderProtocolEditor();
 }
@@ -1059,6 +1168,36 @@ function deleteCurrentPhase() {
   persistFocusPlanner();
   const nextKeys = Object.keys(protocolData).sort((a, b) => Number(a) - Number(b));
   editorPhase = nextKeys[Math.max(0, Math.min(nextKeys.length - 1, phaseKeys.indexOf(String(deletedPhase)) - 1))] || '1';
+  persistProtocol();
+  renderProtocolEditor();
+  renderRoutine();
+}
+
+function moveCurrentPhase(delta) {
+  const phaseKeys = Object.keys(protocolData).sort((a, b) => Number(a) - Number(b));
+  const currentIndex = phaseKeys.indexOf(editorPhase);
+  const targetIndex = currentIndex + delta;
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= phaseKeys.length) return;
+
+  const reorderedKeys = phaseKeys.slice();
+  const [moved] = reorderedKeys.splice(currentIndex, 1);
+  reorderedKeys.splice(targetIndex, 0, moved);
+
+  const nextProtocol = {};
+  const phaseMap = {};
+  reorderedKeys.forEach((oldKey, index) => {
+    const newKey = String(index + 1);
+    nextProtocol[newKey] = protocolData[oldKey];
+    phaseMap[oldKey] = newKey;
+  });
+
+  protocolData = nextProtocol;
+  focusPlanner = focusPlanner.map(item => normalizeFocusItem({
+    ...item,
+    phases: (item.phases || []).map(phase => phaseMap[String(phase)] || String(phase))
+  }));
+  persistFocusPlanner();
+  editorPhase = phaseMap[editorPhase] || '1';
   persistProtocol();
   renderProtocolEditor();
   renderRoutine();
@@ -1262,11 +1401,13 @@ function renderFocusEditor() {
   const container = document.getElementById('focus-editor-list');
   container.innerHTML = '';
   const activeCategory = getActiveFocusCategory();
-  const filteredPlanner = focusPlanner.filter(item => item.category === activeCategory);
-  const phaseOptions = Object.keys(protocolData).sort((a, b) => Number(a) - Number(b));
+  const filteredPlanner = focusPlanner.filter(item =>
+    item.category === activeCategory &&
+    (item.phases?.includes(editorPhase) || (!item.phases?.length && editorPhase === '1'))
+  );
 
   if (!filteredPlanner.length) {
-    container.innerHTML = '<div class="editor-empty">No focus blocks yet for this activity focus.</div>';
+    container.innerHTML = '<div class="editor-empty">No focus blocks yet for this activity focus in this phase.</div>';
     return;
   }
 
@@ -1274,9 +1415,6 @@ function renderFocusEditor() {
     const normalized = normalizeFocusItem(item);
     const dayButtons = DAYS.map(day => `
       <button class="focus-day-pill${normalized.days.includes(day) ? ' active' : ''}" onclick="toggleFocusDay(this)" data-day="${day}" type="button">${day.slice(0, 3)}</button>
-    `).join('');
-    const phaseButtons = phaseOptions.map(phase => `
-      <button class="focus-phase-pill${normalized.phases.includes(phase) ? ' active' : ''}" onclick="toggleFocusPhase(this)" data-phase="${phase}" type="button">${protocolData[phase]?.name || `Phase ${phase}`}</button>
     `).join('');
 
     container.insertAdjacentHTML('beforeend', `
@@ -1298,11 +1436,6 @@ function renderFocusEditor() {
         <div class="focus-editor-row">
           <div class="focus-days">${dayButtons}</div>
         </div>
-        <div class="focus-phase-row">
-          <div class="focus-phase-label">Phases</div>
-          <div class="focus-phases">${phaseButtons || '<span class="focus-phase-note">No phases available yet.</span>'}</div>
-          <div class="focus-phase-note">Leave all unselected to show this block in every phase.</div>
-        </div>
       </div>
     `);
   });
@@ -1313,18 +1446,18 @@ function toggleFocusDay(button) {
   scheduleFocusSave();
 }
 
-function toggleFocusPhase(button) {
-  button.classList.toggle('active');
-  scheduleFocusSave();
-}
-
 function saveFocusState() {
   const activeCategory = getActiveFocusCategory();
   const cards = document.querySelectorAll('#focus-editor-list .focus-editor-card');
-  const preserved = focusPlanner.filter(item => item.category !== activeCategory);
+  const preserved = focusPlanner.filter(item =>
+    item.category !== activeCategory || !(item.phases?.includes(editorPhase) || (!item.phases?.length && editorPhase === '1'))
+  );
   const edited = Array.from(cards).map(card => {
     const index = Number(card.getAttribute('data-focus-index'));
-    const originals = focusPlanner.filter(item => item.category === activeCategory);
+    const originals = focusPlanner.filter(item =>
+      item.category === activeCategory &&
+      (item.phases?.includes(editorPhase) || (!item.phases?.length && editorPhase === '1'))
+    );
     const original = originals[index] || {};
     const days = Array.from(card.querySelectorAll('.focus-day-pill.active')).map(dayButton => dayButton.dataset.day);
     return normalizeFocusItem({
@@ -1336,7 +1469,7 @@ function saveFocusState() {
       duration: parseInt(card.querySelector('.focus-duration-input')?.value, 10) || 30,
       days,
       flexible: Boolean(card.querySelector('.focus-flex-input')?.checked),
-      phases: Array.from(card.querySelectorAll('.focus-phase-pill.active')).map(phaseButton => phaseButton.dataset.phase)
+      phases: [editorPhase]
     });
   }).filter(item => item.name);
 
@@ -1357,7 +1490,8 @@ function addFocusItem() {
     time: '07:00',
     duration: 30,
     days: DAYS.slice(0, 5),
-    flexible: true
+    flexible: true,
+    phases: [editorPhase]
   }));
   persistFocusPlanner();
   renderFocusEditor();
@@ -1365,7 +1499,10 @@ function addFocusItem() {
 
 function deleteFocusItem(index) {
   const activeCategory = getActiveFocusCategory();
-  const originals = focusPlanner.filter(item => item.category === activeCategory);
+  const originals = focusPlanner.filter(item =>
+    item.category === activeCategory &&
+    (item.phases?.includes(editorPhase) || (!item.phases?.length && editorPhase === '1'))
+  );
   const targetId = originals[index]?.id;
   focusPlanner = focusPlanner.filter(item => item.id !== targetId);
   persistFocusPlanner();
@@ -1458,10 +1595,12 @@ function importFocusJSON() {
     const activeCategory = getActiveFocusCategory();
     const parsed = JSON.parse(document.getElementById('set-focus-json').value);
     if (!Array.isArray(parsed)) throw new Error('Expected an array');
-    const preserved = focusPlanner.filter(item => item.category !== activeCategory);
+    const preserved = focusPlanner.filter(item =>
+      item.category !== activeCategory || !(item.phases?.includes(editorPhase) || (!item.phases?.length && editorPhase === '1'))
+    );
     focusPlanner = [
       ...preserved,
-      ...parsed.map(item => normalizeFocusItem({ ...item, category: activeCategory }))
+      ...parsed.map(item => normalizeFocusItem({ ...item, category: activeCategory, phases: [editorPhase] }))
     ];
     persistFocusPlanner();
     renderFocusEditor();
@@ -1820,7 +1959,10 @@ window.refreshGoogleCalendarEvents = refreshGoogleCalendarEvents;
 window.disconnectGoogleCalendar = disconnectGoogleCalendar;
 window.toggleGoogleCalendarSelection = toggleGoogleCalendarSelection;
 window.shiftRoutineDay = shiftRoutineDay;
+window.setRoutineDayOffset = setRoutineDayOffset;
+window.jumpToRoutineDate = jumpToRoutineDate;
 window.deleteCurrentPhase = deleteCurrentPhase;
+window.moveCurrentPhase = moveCurrentPhase;
 
 // Init
 syncExportTextareas();
