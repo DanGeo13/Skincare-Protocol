@@ -443,12 +443,7 @@ async function fetchRemoteState() {
 }
 
 async function pushRemoteState() {
-  const data = await callRemoteScript_({
-    action: 'saveState',
-    payload: JSON.stringify(buildRemoteStatePayload())
-  });
-  if (!data.ok) throw new Error(data.error || 'Failed to save remote state');
-  return data;
+  return postRemoteScript_(buildRemoteStatePayload());
 }
 
 function callRemoteScript_(params = {}) {
@@ -486,6 +481,23 @@ function callRemoteScript_(params = {}) {
     };
     document.body.appendChild(script);
   });
+}
+
+function postRemoteScript_(data) {
+  return fetch(REMOTE_SYNC_CONFIG.webAppUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8'
+    },
+    body: JSON.stringify({
+      action: 'saveState',
+      data
+    })
+  }).then(() => ({
+    ok: true,
+    savedAt: new Date().toISOString()
+  }));
 }
 
 async function syncToRemote(force = false) {
@@ -1140,12 +1152,13 @@ function startTimer(e, seconds) {
 }
 
 function describeGoogleError(error) {
-  return error?.result?.error?.message
+  const detail = error?.result?.error?.message
     || error?.result?.error?.details
     || error?.details
     || error?.message
     || error?.error
-    || (typeof error === 'string' ? error : JSON.stringify(error));
+    || error;
+  return typeof detail === 'string' ? detail : JSON.stringify(detail);
 }
 
 function maybeRequestNotificationPermission() {
